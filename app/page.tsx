@@ -329,6 +329,7 @@ type ChatMsg = { id: string; role: "user" | "assistant"; content: string; create
 function useChat() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [sessionId] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = sessionStorage.getItem("ogma_chat_session");
@@ -339,6 +340,34 @@ function useChat() {
     }
     return crypto.randomUUID();
   });
+
+  // Load chat history from DB on mount
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        const { data, error } = await supabase
+          .from("chat_messages")
+          .select("id, role, content, created_at")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true })
+          .limit(50);
+        if (!error && data && data.length > 0) {
+          setMessages(data.map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            created_at: m.created_at,
+          })));
+        }
+      } catch (e) {
+        console.error("Failed to load chat history:", e);
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+    loadHistory();
+  }, [sessionId]);
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
@@ -391,11 +420,11 @@ function useChat() {
     sessionStorage.setItem("ogma_chat_session", id);
   }, []);
 
-  return { messages, sending, send, clearChat, sessionId };
+  return { messages, sending, send, clearChat, sessionId, loadingHistory };
 }
 
 function ChatWindow({ status }: { status: string }) {
-  const { messages, sending, send, clearChat } = useChat();
+  const { messages, sending, send, clearChat, loadingHistory } = useChat();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -432,7 +461,13 @@ function ChatWindow({ status }: { status: string }) {
 
       {/* Messages */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 14 }}>
-        {messages.length === 0 && (
+        {loadingHistory && messages.length === 0 && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <OgmaAvatar status="thinking" size={80} />
+            <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center" }}>Loading conversation...</div>
+          </div>
+        )}
+        {!loadingHistory && messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
             <OgmaAvatar status="idle" size={80} />
             <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
