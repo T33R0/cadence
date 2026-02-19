@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useDashboardData } from "@/lib/hooks";
+import { CHAT_FUNCTION_URL } from "@/lib/supabase";
+import type { ChatMessage } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════════════════
    COLOR SYSTEM — Deep ocean + bioluminescence
@@ -39,6 +41,7 @@ const Shield = Ic(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />);
 const CpuIc = Ic(<><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /></>);
 const DbIc = Ic(<><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></>);
 const Refresh = Ic(<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>);
+const MsgCircle = Ic(<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>);
 
 /* ═══════════════════════════════════════════════════════════════
    OGMA AVATAR — Canvas-based crystalline intelligence
@@ -319,6 +322,196 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   CHAT WITH OGMA
+   ═══════════════════════════════════════════════════════════════ */
+type ChatMsg = { id: string; role: "user" | "assistant"; content: string; created_at: string };
+
+function useChat() {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [sending, setSending] = useState(false);
+  const [sessionId] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("ogma_chat_session");
+      if (stored) return stored;
+      const id = crypto.randomUUID();
+      sessionStorage.setItem("ogma_chat_session", id);
+      return id;
+    }
+    return crypto.randomUUID();
+  });
+
+  const send = useCallback(async (text: string) => {
+    if (!text.trim() || sending) return;
+    const userMsg: ChatMsg = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text.trim(),
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setSending(true);
+
+    try {
+      const res = await fetch(CHAT_FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text.trim(), session_id: sessionId }),
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setMessages(prev => [...prev, {
+          id: data.message_id || crypto.randomUUID(),
+          role: "assistant",
+          content: data.reply,
+          created_at: new Date().toISOString(),
+        }]);
+      } else if (data.error) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Error: ${data.error}`,
+          created_at: new Date().toISOString(),
+        }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "Connection error. Check that the Edge Function is running.",
+        created_at: new Date().toISOString(),
+      }]);
+    } finally {
+      setSending(false);
+    }
+  }, [sending, sessionId]);
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    const id = crypto.randomUUID();
+    sessionStorage.setItem("ogma_chat_session", id);
+  }, []);
+
+  return { messages, sending, send, clearChat, sessionId };
+}
+
+function ChatWindow({ status }: { status: string }) {
+  const { messages, sending, send, clearChat } = useChat();
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = () => {
+    if (input.trim()) {
+      send(input);
+      setInput("");
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", maxHeight: 800 }}>
+      {/* Chat header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <OgmaAvatar status={status} size={32} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Ogma</div>
+            <div style={{ fontSize: 10, color: sending ? C.cyan : C.green }}>
+              {sending ? "thinking..." : "online"}
+            </div>
+          </div>
+        </div>
+        <button onClick={clearChat} style={{ fontSize: 10, color: C.textDim, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+          New Chat
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 14 }}>
+        {messages.length === 0 && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <OgmaAvatar status="idle" size={80} />
+            <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
+              Talk directly with Ogma. Ask about tasks, training, DDPC status, or anything on your mind.
+            </div>
+          </div>
+        )}
+        {messages.map(msg => (
+          <div key={msg.id} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", gap: 10 }}>
+            {msg.role === "assistant" && (
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                <MsgCircle size={14} color={C.cyan} />
+              </div>
+            )}
+            <div style={{
+              maxWidth: "75%",
+              padding: "10px 14px",
+              borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+              background: msg.role === "user" ? `${C.accent}18` : C.surface,
+              border: `1px solid ${msg.role === "user" ? C.accent + "25" : C.border}`,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: C.text,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        {sending && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <MsgCircle size={14} color={C.cyan} />
+            </div>
+            <div style={{ padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: C.surface, border: `1px solid ${C.border}`, display: "flex", gap: 4 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: "50%", background: C.cyan,
+                  animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                  opacity: 0.4,
+                }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: 10, padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "0 0 14px 14px" }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+          placeholder="Message Ogma..."
+          disabled={sending}
+          style={{
+            flex: 1, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 10,
+            padding: "10px 14px", color: C.text, fontSize: 13, outline: "none",
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || !input.trim()}
+          style={{
+            width: 42, height: 42, borderRadius: 10, border: "none", cursor: "pointer",
+            background: input.trim() ? `linear-gradient(135deg, ${C.accent}, ${C.cyan})` : C.surfaceHi,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            opacity: input.trim() ? 1 : 0.4, transition: "all 0.2s",
+          }}
+        >
+          <SendIc size={16} color={input.trim() ? "#fff" : C.textDim} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MAIN DASHBOARD
    ═══════════════════════════════════════════════════════════════ */
 export default function OgmaCommandCenter() {
@@ -348,6 +541,7 @@ export default function OgmaCommandCenter() {
     { id: "training", icon: Dumbbell, label: "Training" },
     { id: "cost", icon: Dollar, label: "Cost" },
     { id: "soul", icon: Shield, label: "Soul" },
+    { id: "chat", icon: MsgCircle, label: "Chat" },
   ];
 
   // Loading state
@@ -377,7 +571,7 @@ export default function OgmaCommandCenter() {
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 18 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, boxShadow: `0 0 8px ${C.green}60` }} />
-          <span style={{ fontSize: 8, color: C.textDim, writingMode: "vertical-lr" as any, transform: "rotate(180deg)" }}>v0.1</span>
+          <span style={{ fontSize: 8, color: C.textDim, writingMode: "vertical-lr" as any, transform: "rotate(180deg)" }}>v0.2</span>
         </div>
       </nav>
 
@@ -688,13 +882,20 @@ export default function OgmaCommandCenter() {
           </div>
         )}
 
+        {/* ══════════ CHAT ══════════ */}
+        {activeTab === "chat" && (
+          <div className="fade-in">
+            <ChatWindow status={agentStatus} />
+          </div>
+        )}
+
         {/* Footer */}
         <footer style={{ marginTop: 28, padding: "14px 0", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
             <span style={{ fontSize: 11, color: C.textMuted }}>connected · bghyjxxjtkzvmfkbibqp</span>
           </div>
-          <span style={{ fontSize: 11, color: C.textDim }}>{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · Ogma CC v0.1.0</span>
+          <span style={{ fontSize: 11, color: C.textDim }}>{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · Ogma CC v0.2.0</span>
         </footer>
       </main>
     </div>

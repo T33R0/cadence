@@ -133,3 +133,17 @@ export type BodyMetric = {
   notes: string | null;
   created_at: string;
 };
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  session_id: string;
+  created_at: string;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  model_used: string | null;
+};
+
+// Edge Function URL for chat
+export const CHAT_FUNCTION_URL = `${supabaseUrl}/functions/v1/chat`;
