@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDashboardData } from "@/lib/hooks";
-import { CHAT_FUNCTION_URL } from "@/lib/supabase";
+import { CHAT_FUNCTION_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import type { ChatMessage } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -326,7 +326,7 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
    ═══════════════════════════════════════════════════════════════ */
 type ChatMsg = { id: string; role: "user" | "assistant"; content: string; created_at: string };
 
-function useChat() {
+function useChat(onDataChanged?: () => void) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -383,7 +383,11 @@ function useChat() {
     try {
       const res = await fetch(CHAT_FUNCTION_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
         body: JSON.stringify({ message: text.trim(), session_id: sessionId }),
       });
       const data = await res.json();
@@ -394,6 +398,10 @@ function useChat() {
           content: data.reply,
           created_at: new Date().toISOString(),
         }]);
+        // Auto-refresh dashboard data when Ogma used tools (created tasks, saved memories, etc.)
+        if (data.tool_calls > 0 && onDataChanged) {
+          setTimeout(() => onDataChanged(), 500);
+        }
       } else if (data.error) {
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
@@ -412,7 +420,7 @@ function useChat() {
     } finally {
       setSending(false);
     }
-  }, [sending, sessionId]);
+  }, [sending, sessionId, onDataChanged]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
@@ -423,8 +431,8 @@ function useChat() {
   return { messages, sending, send, clearChat, sessionId, loadingHistory };
 }
 
-function ChatWindow({ status }: { status: string }) {
-  const { messages, sending, send, clearChat, loadingHistory } = useChat();
+function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?: () => void }) {
+  const { messages, sending, send, clearChat, loadingHistory } = useChat(onDataChanged);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -920,7 +928,7 @@ export default function OgmaCommandCenter() {
         {/* ══════════ CHAT ══════════ */}
         {activeTab === "chat" && (
           <div className="fade-in">
-            <ChatWindow status={agentStatus} />
+            <ChatWindow status={agentStatus} onDataChanged={d.refetchAll} />
           </div>
         )}
 
