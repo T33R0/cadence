@@ -45,12 +45,12 @@ const X = Ic(<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18"
    CADENCE AVATAR — The Living Pulse Ring
    ═══════════════════════════════════════════════════════════════ */
 const CAD = {
-  base: "#00E5CC",       // cyan-teal
-  violet: "#7B61FF",     // thinking/processing
-  green: "#00FF88",      // success
-  red: "#FF3D5A",        // error/alert
-  orange: "#FF8800",     // deep work / zone
-  bg: "#0A0A0F",         // near-black
+  base: "#00E5CC",
+  violet: "#7B61FF",
+  green: "#00FF88",
+  red: "#FF3D5A",
+  orange: "#FF8800",
+  bg: "#0A0A0F",
 };
 
 function CadenceAvatar({ status = "online", size = 200 }: { status?: string; size?: number }) {
@@ -97,56 +97,11 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
     let successPingT = -1;
 
     function getStateParams(s: string) {
-      if (s === "thinking") return {
-        rotSpeed: Math.PI * 2 / 4,
-        pulseFreq: 2.5,
-        pulseAmp: 0.7,
-        color: [123, 97, 255] as number[],
-        glowIntensity: 1.4,
-        harmonic2: 0.35,
-        particleCount: 18,
-        particleOrbit: true,
-      };
-      if (s === "success") return {
-        rotSpeed: Math.PI * 2 / 8,
-        pulseFreq: 1.0,
-        pulseAmp: 0.4,
-        color: [0, 229, 204] as number[],
-        glowIntensity: 1.6,
-        harmonic2: 0,
-        particleCount: 8,
-        particleOrbit: false,
-      };
-      if (s === "error") return {
-        rotSpeed: Math.PI * 2 / 8,
-        pulseFreq: 4.0,
-        pulseAmp: 1.0,
-        color: [255, 61, 90] as number[],
-        glowIntensity: 1.2,
-        harmonic2: 0,
-        particleCount: 5,
-        particleOrbit: false,
-      };
-      if (s === "idle") return {
-        rotSpeed: Math.PI * 2 / 8,
-        pulseFreq: 1.0,
-        pulseAmp: 0.25,
-        color: [0, 229 * 0.7, 204 * 0.7] as number[],
-        glowIntensity: 0.5,
-        harmonic2: 0,
-        particleCount: 6,
-        particleOrbit: false,
-      };
-      return {
-        rotSpeed: Math.PI * 2 / 8,
-        pulseFreq: 1.0,
-        pulseAmp: 0.35,
-        color: [0, 229, 204] as number[],
-        glowIntensity: 1.0,
-        harmonic2: 0,
-        particleCount: 8,
-        particleOrbit: false,
-      };
+      if (s === "thinking") return { rotSpeed: Math.PI * 2 / 4, pulseFreq: 2.5, pulseAmp: 0.7, color: [123, 97, 255] as number[], glowIntensity: 1.4, harmonic2: 0.35, particleCount: 18, particleOrbit: true };
+      if (s === "success") return { rotSpeed: Math.PI * 2 / 8, pulseFreq: 1.0, pulseAmp: 0.4, color: [0, 229, 204] as number[], glowIntensity: 1.6, harmonic2: 0, particleCount: 8, particleOrbit: false };
+      if (s === "error") return { rotSpeed: Math.PI * 2 / 8, pulseFreq: 4.0, pulseAmp: 1.0, color: [255, 61, 90] as number[], glowIntensity: 1.2, harmonic2: 0, particleCount: 5, particleOrbit: false };
+      if (s === "idle") return { rotSpeed: Math.PI * 2 / 8, pulseFreq: 1.0, pulseAmp: 0.25, color: [0, 229 * 0.7, 204 * 0.7] as number[], glowIntensity: 0.5, harmonic2: 0, particleCount: 6, particleOrbit: false };
+      return { rotSpeed: Math.PI * 2 / 8, pulseFreq: 1.0, pulseAmp: 0.35, color: [0, 229, 204] as number[], glowIntensity: 1.0, harmonic2: 0, particleCount: 8, particleOrbit: false };
     }
 
     function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
@@ -158,7 +113,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       const s = stateRef.current.status;
       const transT = Math.min(1, (ts - stateRef.current.transitionStart) / 400);
       const easeT = transT < 1 ? transT * transT * (3 - 2 * transT) : 1;
-
       const cur = getStateParams(s);
       const prev = getStateParams(stateRef.current.prevStatus);
       const rotSpeed = lerp(prev.rotSpeed, cur.rotSpeed, easeT);
@@ -167,19 +121,13 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       const color = lerpColor(prev.color, cur.color, easeT);
       const glowI = lerp(prev.glowIntensity, cur.glowIntensity, easeT);
       const harm2 = lerp(prev.harmonic2, cur.harmonic2, easeT);
-
-      if (s === "success" && stateRef.current.prevStatus !== "success" && transT < 0.1) {
-        successPingT = elapsed;
-      }
-
+      if (s === "success" && stateRef.current.prevStatus !== "success" && transT < 0.1) successPingT = elapsed;
       ctx.clearRect(0, 0, size, size);
       ctx.fillStyle = CAD.bg;
       ctx.fillRect(0, 0, size, size);
-
       const yOsc = Math.sin(elapsed * Math.PI * 2 / 4) * 2;
       const ccy = cy + yOsc;
       const rotAngle = elapsed * rotSpeed;
-
       const glowR = ringR + tubeR * 1.15;
       const auraGrad = ctx.createRadialGradient(cx, ccy, ringR * 0.6, cx, ccy, glowR * 1.3);
       auraGrad.addColorStop(0, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.06 * glowI})`);
@@ -187,16 +135,11 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       auraGrad.addColorStop(1, "transparent");
       ctx.fillStyle = auraGrad;
       ctx.beginPath(); ctx.arc(cx, ccy, glowR * 1.3, 0, Math.PI * 2); ctx.fill();
-
       const lightAngle = -Math.PI * 0.75;
-
       for (let i = 0; i < SEGMENTS; i++) {
         const a1 = (i / SEGMENTS) * Math.PI * 2;
         const a2 = ((i + 1) / SEGMENTS) * Math.PI * 2;
-
         const tiltY1 = Math.sin(a1) * TILT_X;
-        const tiltY2 = Math.sin(a2) * TILT_X;
-
         const pulsePhase = a1 - elapsed * pulseFreq * Math.PI * 2;
         const displacement = Math.sin(pulsePhase) * pulseAmp * tubeR;
         const displacement2 = Math.sin(pulsePhase * 2.3 + 0.5) * harm2 * tubeR;
@@ -206,29 +149,23 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
           errorSpike = sawPhase < 1.0 ? (1 - sawPhase) * tubeR * 1.5 * (1 - transT) : 0;
         }
         const totalDisp = displacement + displacement2 + errorSpike;
-
         const ra1 = a1 + rotAngle;
         const ra2 = a2 + rotAngle;
         const x1 = cx + Math.cos(ra1) * (ringR + totalDisp);
         const y1 = ccy + Math.sin(ra1) * (ringR + totalDisp) * (1 - TILT_X * 0.3);
         const x2 = cx + Math.cos(ra2) * (ringR + totalDisp);
         const y2 = ccy + Math.sin(ra2) * (ringR + totalDisp) * (1 - TILT_X * 0.3);
-
         const depthFactor = 1 + tiltY1 * 0.5;
         const currentTube = tubeR * depthFactor * (0.8 + pulseAmp * 0.2 * Math.abs(Math.sin(pulsePhase)));
-
         const normalAngle = ra1;
         const lightDot = Math.cos(normalAngle - lightAngle) * 0.5 + 0.5;
         const depthLight = (1 + tiltY1) * 0.5;
         const brightness = 0.2 + lightDot * 0.5 + depthLight * 0.3;
-
         const sss = Math.max(0, Math.sin(pulsePhase)) * pulseAmp * 0.4;
-
         const r = Math.round(color[0] * brightness + sss * 40);
         const g = Math.round(color[1] * brightness + sss * 60);
         const b = Math.round(color[2] * brightness + sss * 50);
         const alpha = 0.7 + brightness * 0.3;
-
         ctx.beginPath();
         ctx.strokeStyle = `rgba(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)},${alpha})`;
         ctx.lineWidth = currentTube * 2;
@@ -237,7 +174,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         ctx.lineTo(x2, y2);
         ctx.stroke();
       }
-
       const innerGlow = ctx.createRadialGradient(cx, ccy, ringR * 0.85, cx, ccy, ringR * 1.15);
       innerGlow.addColorStop(0, "transparent");
       innerGlow.addColorStop(0.4, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.04 * glowI})`);
@@ -245,7 +181,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       innerGlow.addColorStop(1, "transparent");
       ctx.fillStyle = innerGlow;
       ctx.beginPath(); ctx.arc(cx, ccy, ringR * 1.15, 0, Math.PI * 2); ctx.fill();
-
       ctx.beginPath();
       ctx.strokeStyle = `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.5 * glowI})`;
       ctx.lineWidth = 1;
@@ -261,7 +196,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
-
       const pulseAngle = rotAngle + elapsed * pulseFreq * Math.PI * 2;
       const px = cx + Math.cos(pulseAngle) * ringR;
       const py = ccy + Math.sin(pulseAngle) * ringR * (1 - TILT_X * 0.3);
@@ -271,25 +205,16 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       pulseGlow.addColorStop(1, "transparent");
       ctx.fillStyle = pulseGlow;
       ctx.beginPath(); ctx.arc(px, py, tubeR * 3, 0, Math.PI * 2); ctx.fill();
-
       if (successPingT > 0) {
         const pingAge = elapsed - successPingT;
         if (pingAge < 1.0) {
           const pingR = ringR + pingAge * size * 0.2;
           const pingAlpha = (1 - pingAge) * 0.6;
-          ctx.beginPath();
-          ctx.arc(cx, ccy, pingR, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(0,255,136,${pingAlpha})`;
-          ctx.lineWidth = 2 * (1 - pingAge);
-          ctx.stroke();
+          ctx.beginPath(); ctx.arc(cx, ccy, pingR, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0,255,136,${pingAlpha})`; ctx.lineWidth = 2 * (1 - pingAge); ctx.stroke();
         }
       }
-
-      const activeCount = Math.round(lerp(
-        getStateParams(stateRef.current.prevStatus).particleCount,
-        cur.particleCount,
-        easeT
-      ));
+      const activeCount = Math.round(lerp(getStateParams(stateRef.current.prevStatus).particleCount, cur.particleCount, easeT));
       const orbitDir = cur.particleOrbit ? 1 : 0;
       particles.forEach((pt, idx) => {
         if (idx >= activeCount) return;
@@ -297,26 +222,19 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         const x = cx + Math.cos(pt.angle) * pt.dist;
         const y = ccy + Math.sin(pt.angle) * pt.dist;
         const op = pt.opacity * glowI * (0.4 + Math.sin(elapsed * 2 + idx) * 0.3);
-        ctx.beginPath(); ctx.arc(x, y, pt.sz, 0, Math.PI * 2);
         const pg = ctx.createRadialGradient(x, y, 0, x, y, pt.sz * 2);
         pg.addColorStop(0, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${op})`);
         pg.addColorStop(1, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},0)`);
         ctx.fillStyle = pg;
         ctx.beginPath(); ctx.arc(x, y, pt.sz * 2, 0, Math.PI * 2); ctx.fill();
       });
-
       animRef.current = requestAnimationFrame(draw);
     }
-
     animRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animRef.current);
   }, [size]);
 
-  const glowColor = status === "thinking" ? CAD.violet
-    : status === "error" ? CAD.red
-    : status === "success" ? CAD.green
-    : CAD.base;
-
+  const glowColor = status === "thinking" ? CAD.violet : status === "error" ? CAD.red : status === "success" ? CAD.green : CAD.base;
   return (
     <canvas ref={canvasRef} style={{
       width: size, height: size, borderRadius: "50%",
@@ -347,7 +265,7 @@ function StatCard({ icon: Icon, label, value, color = C.accent, sub }: any) {
 
 function Panel({ title, icon: Icon, color = C.accent, children, action }: any) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
       <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border}`, background: `${color}06` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon size={15} color={color} />
@@ -388,11 +306,25 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LABELED INPUT HELPER
+   ═══════════════════════════════════════════════════════════════ */
+const inputStyle = { padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13, width: "100%" as const };
+
+function LabeledInput({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</div>
+      <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    NUTRITION FORM
    ═══════════════════════════════════════════════════════════════ */
 function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
   const [form, setForm] = useState({
-    time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+    time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Denver" }),
     description: "",
     meal_type: "lunch",
     protein: 30,
@@ -407,7 +339,7 @@ function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
     if (!form.description.trim()) return;
     setSubmitting(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
       const { error } = await supabase.from("nutrition_meals").insert({
         date: today,
         time_logged: form.time,
@@ -421,16 +353,7 @@ function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
         calories: form.calories,
       });
       if (!error) {
-        setForm({
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
-          description: "",
-          meal_type: "lunch",
-          protein: 30,
-          carbs: 20,
-          fat: 15,
-          fiber: 5,
-          calories: 350,
-        });
+        setForm({ ...form, description: "" });
         onSuccess();
       }
     } catch (e) {
@@ -443,74 +366,33 @@ function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <input
-          type="time"
-          value={form.time}
-          onChange={e => setForm({ ...form, time: e.target.value })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <select
-          value={form.meal_type}
-          onChange={e => setForm({ ...form, meal_type: e.target.value })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        >
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-          <option value="snack">Snack</option>
-        </select>
-        <input
-          type="text"
-          placeholder="Meal description"
-          value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })}
-          style={{ gridColumn: "1 / -1", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Protein (g)"
-          value={form.protein}
-          onChange={e => setForm({ ...form, protein: Number(e.target.value) })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Carbs (g)"
-          value={form.carbs}
-          onChange={e => setForm({ ...form, carbs: Number(e.target.value) })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Fat (g)"
-          value={form.fat}
-          onChange={e => setForm({ ...form, fat: Number(e.target.value) })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Calories"
-          value={form.calories}
-          onChange={e => setForm({ ...form, calories: Number(e.target.value) })}
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
+        <LabeledInput label="Time" type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} />
+        <div>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Meal Type</div>
+          <select value={form.meal_type} onChange={e => setForm({ ...form, meal_type: e.target.value })} style={{ ...inputStyle }}>
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+          </select>
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <LabeledInput label="Description" type="text" placeholder="e.g. Grilled chicken + avocado" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <LabeledInput label="Protein (g)" type="number" value={form.protein} onChange={e => setForm({ ...form, protein: Number(e.target.value) })} />
+        <LabeledInput label="Carbs (g)" type="number" value={form.carbs} onChange={e => setForm({ ...form, carbs: Number(e.target.value) })} />
+        <LabeledInput label="Fat (g)" type="number" value={form.fat} onChange={e => setForm({ ...form, fat: Number(e.target.value) })} />
+        <LabeledInput label="Fiber (g)" type="number" value={form.fiber} onChange={e => setForm({ ...form, fiber: Number(e.target.value) })} />
+        <div style={{ gridColumn: "1 / -1" }}>
+          <LabeledInput label="Calories (kcal)" type="number" value={form.calories} onChange={e => setForm({ ...form, calories: Number(e.target.value) })} />
+        </div>
       </div>
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || !form.description.trim()}
-        style={{
-          width: "100%",
-          marginTop: 12,
-          padding: "12px",
-          borderRadius: 8,
-          border: "none",
-          background: C.green,
-          color: "#000",
-          fontWeight: 600,
-          cursor: submitting ? "default" : "pointer",
-          opacity: submitting || !form.description.trim() ? 0.5 : 1,
-        }}
-      >
+      <button onClick={handleSubmit} disabled={submitting || !form.description.trim()} style={{
+        width: "100%", marginTop: 12, padding: "12px", borderRadius: 8, border: "none",
+        background: C.green, color: "#000", fontWeight: 600,
+        cursor: submitting ? "default" : "pointer",
+        opacity: submitting || !form.description.trim() ? 0.5 : 1,
+      }}>
         {submitting ? "Saving..." : "Log Meal"}
       </button>
     </div>
@@ -521,18 +403,14 @@ function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
    BODY METRICS FORM
    ═══════════════════════════════════════════════════════════════ */
 function BodyMetricsForm({ onSuccess }: { onSuccess: () => void }) {
-  const [form, setForm] = useState({
-    weight_lbs: "",
-    body_fat: "",
-    resting_hr: "",
-  });
+  const [form, setForm] = useState({ weight_lbs: "", body_fat: "", resting_hr: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!form.weight_lbs) return;
     setSubmitting(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
       const { error } = await supabase.from("body_metrics").insert({
         date: today,
         weight_lbs: parseFloat(form.weight_lbs),
@@ -553,46 +431,18 @@ function BodyMetricsForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <input
-          type="number"
-          placeholder="Weight (lbs)"
-          value={form.weight_lbs}
-          onChange={e => setForm({ ...form, weight_lbs: e.target.value })}
-          step="0.1"
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Body Fat %"
-          value={form.body_fat}
-          onChange={e => setForm({ ...form, body_fat: e.target.value })}
-          step="0.1"
-          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
-        <input
-          type="number"
-          placeholder="Resting HR (bpm)"
-          value={form.resting_hr}
-          onChange={e => setForm({ ...form, resting_hr: e.target.value })}
-          style={{ gridColumn: "1 / -1", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
-        />
+        <LabeledInput label="Weight (lbs)" type="number" placeholder="e.g. 185.5" value={form.weight_lbs} onChange={e => setForm({ ...form, weight_lbs: e.target.value })} step="0.1" />
+        <LabeledInput label="Body Fat (%)" type="number" placeholder="e.g. 18.2" value={form.body_fat} onChange={e => setForm({ ...form, body_fat: e.target.value })} step="0.1" />
+        <div style={{ gridColumn: "1 / -1" }}>
+          <LabeledInput label="Resting HR (bpm)" type="number" placeholder="e.g. 62" value={form.resting_hr} onChange={e => setForm({ ...form, resting_hr: e.target.value })} />
+        </div>
       </div>
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || !form.weight_lbs}
-        style={{
-          width: "100%",
-          marginTop: 12,
-          padding: "12px",
-          borderRadius: 8,
-          border: "none",
-          background: C.cyan,
-          color: "#000",
-          fontWeight: 600,
-          cursor: submitting ? "default" : "pointer",
-          opacity: submitting || !form.weight_lbs ? 0.5 : 1,
-        }}
-      >
+      <button onClick={handleSubmit} disabled={submitting || !form.weight_lbs} style={{
+        width: "100%", marginTop: 12, padding: "12px", borderRadius: 8, border: "none",
+        background: C.cyan, color: "#000", fontWeight: 600,
+        cursor: submitting ? "default" : "pointer",
+        opacity: submitting || !form.weight_lbs ? 0.5 : 1,
+      }}>
         {submitting ? "Saving..." : "Log Metrics"}
       </button>
     </div>
@@ -616,9 +466,7 @@ function useChat(onDataChanged?: () => void) {
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [model, setModelState] = useState(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("cadence_chat_model") || "haiku-4.5";
-    }
+    if (typeof window !== "undefined") return sessionStorage.getItem("cadence_chat_model") || "haiku-4.5";
     return "haiku-4.5";
   });
   const setModel = useCallback((m: string) => {
@@ -646,72 +494,35 @@ function useChat(onDataChanged?: () => void) {
           .order("created_at", { ascending: true })
           .limit(50);
         if (!error && data && data.length > 0) {
-          setMessages(data.map((m: any) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            created_at: m.created_at,
-          })));
+          setMessages(data.map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at })));
         }
-      } catch (e) {
-        console.error("Failed to load chat history:", e);
-      } finally {
-        setLoadingHistory(false);
-      }
+      } catch (e) { console.error("Failed to load chat history:", e); }
+      finally { setLoadingHistory(false); }
     }
     loadHistory();
   }, [sessionId]);
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
-    const userMsg: ChatMsg = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text.trim(),
-      created_at: new Date().toISOString(),
-    };
+    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: "user", content: text.trim(), created_at: new Date().toISOString() };
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
-
     try {
       const res = await fetch(CHAT_FUNCTION_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ message: text.trim(), session_id: sessionId, model }),
       });
       const data = await res.json();
       if (data.reply) {
-        setMessages(prev => [...prev, {
-          id: data.message_id || crypto.randomUUID(),
-          role: "assistant",
-          content: data.reply,
-          created_at: new Date().toISOString(),
-        }]);
-        if (data.tool_calls > 0 && onDataChanged) {
-          setTimeout(() => onDataChanged(), 500);
-        }
+        setMessages(prev => [...prev, { id: data.message_id || crypto.randomUUID(), role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
+        if (data.tool_calls > 0 && onDataChanged) setTimeout(() => onDataChanged(), 500);
       } else if (data.error) {
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `Error: ${data.error}`,
-          created_at: new Date().toISOString(),
-        }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Error: ${data.error}`, created_at: new Date().toISOString() }]);
       }
     } catch {
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "Connection error. Check that the Edge Function is running.",
-        created_at: new Date().toISOString(),
-      }]);
-    } finally {
-      setSending(false);
-    }
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Connection error. Check that the Edge Function is running.", created_at: new Date().toISOString() }]);
+    } finally { setSending(false); }
   }, [sending, sessionId, onDataChanged, model]);
 
   const clearChat = useCallback(() => {
@@ -723,141 +534,132 @@ function useChat(onDataChanged?: () => void) {
   return { messages, sending, send, clearChat, sessionId, loadingHistory, model, setModel };
 }
 
-function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?: () => void }) {
+function ChatWindow({ status, onDataChanged, todayCost, totalTokens }: { status: string; onDataChanged?: () => void; todayCost: number; totalTokens: number }) {
   const { messages, sending, send, clearChat, loadingHistory, model, setModel } = useChat(onDataChanged);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const handleSend = () => {
-    if (input.trim()) {
-      send(input);
-      setInput("");
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
     }
+  }, [input]);
+
+  const handleSend = () => {
+    if (input.trim()) { send(input); setInput(""); }
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 100px)", background: C.bg }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 76px)", maxHeight: "calc(100dvh - 76px)" }}>
+      {/* Daily spending banner */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: C.surfaceAlt, borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Dollar size={14} color={C.cyan} />
+          <span style={{ fontSize: 11, color: C.textMuted }}>Today&apos;s Spend</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.cyan }}>${todayCost.toFixed(3)}</span>
+          <span style={{ fontSize: 10, color: C.textDim }}>{(totalTokens / 1000).toFixed(1)}K tokens</span>
+          <span style={{ fontSize: 10, color: C.textDim }}>$10/day</span>
+        </div>
+      </div>
+
       {/* Chat header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.surface, borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <CadenceAvatar status={status} size={32} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: C.surface, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <CadenceAvatar status={status} size={28} />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Cadence</div>
-            <div style={{ fontSize: 10, color: sending ? C.cyan : C.green }}>
-              {sending ? "thinking..." : "online"}
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Cadence</div>
+            <div style={{ fontSize: 9, color: sending ? C.cyan : C.green }}>{sending ? "thinking..." : "online"}</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <select
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            disabled={sending}
-            style={{
-              fontSize: 10, color: C.textSoft, background: C.surfaceHi, border: `1px solid ${C.border}`,
-              borderRadius: 6, padding: "4px 8px", cursor: "pointer", outline: "none",
-              appearance: "none", WebkitAppearance: "none",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center",
-              paddingRight: 20,
-            }}
-          >
-            {MODEL_OPTIONS.map(m => (
-              <option key={m.key} value={m.key}>{m.label} ({m.cost})</option>
-            ))}
+          <select value={model} onChange={e => setModel(e.target.value)} disabled={sending} style={{
+            fontSize: 10, color: C.textSoft, background: C.surfaceHi, border: `1px solid ${C.border}`,
+            borderRadius: 6, padding: "4px 8px", cursor: "pointer", outline: "none",
+          }}>
+            {MODEL_OPTIONS.map(m => (<option key={m.key} value={m.key}>{m.label} ({m.cost})</option>))}
           </select>
-          <button onClick={clearChat} style={{ fontSize: 10, color: C.textDim, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
-            New Chat
-          </button>
+          <button onClick={clearChat} style={{ fontSize: 10, color: C.textDim, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>New</button>
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
         {loadingHistory && messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            <CadenceAvatar status="thinking" size={80} />
-            <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center" }}>Loading conversation...</div>
+            <CadenceAvatar status="thinking" size={60} />
+            <div style={{ fontSize: 12, color: C.textMuted }}>Loading...</div>
           </div>
         )}
         {!loadingHistory && messages.length === 0 && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            <CadenceAvatar status="idle" size={80} />
-            <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
-              Talk directly with Cadence. Ask about tasks, training, nutrition, body metrics, or anything on your mind.
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+            <CadenceAvatar status="idle" size={60} />
+            <div style={{ fontSize: 12, color: C.textMuted, textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
+              Talk to Cadence about tasks, training, nutrition, or anything on your mind.
             </div>
           </div>
         )}
         {messages.map(msg => (
-          <div key={msg.id} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", gap: 10 }}>
+          <div key={msg.id} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", gap: 8 }}>
             {msg.role === "assistant" && (
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                <MsgCircle size={14} color={C.cyan} />
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                <MsgCircle size={12} color={C.cyan} />
               </div>
             )}
             <div style={{
-              maxWidth: "75%",
-              padding: "10px 14px",
-              borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+              maxWidth: "80%", padding: "8px 12px",
+              borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
               background: msg.role === "user" ? `${C.accent}18` : C.surface,
               border: `1px solid ${msg.role === "user" ? C.accent + "25" : C.border}`,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: C.text,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
+              fontSize: 13, lineHeight: 1.6, color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
               {msg.content}
             </div>
           </div>
         ))}
         {sending && (
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <MsgCircle size={14} color={C.cyan} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: `${C.cyan}12`, border: `1px solid ${C.cyan}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <MsgCircle size={12} color={C.cyan} />
             </div>
-            <div style={{ padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: C.surface, border: `1px solid ${C.border}`, display: "flex", gap: 4 }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: 6, height: 6, borderRadius: "50%", background: C.cyan,
-                  animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-                  opacity: 0.4,
-                }} />
-              ))}
+            <div style={{ padding: "8px 12px", borderRadius: "12px 12px 12px 4px", background: C.surface, border: `1px solid ${C.border}`, display: "flex", gap: 4 }}>
+              {[0, 1, 2].map(i => (<div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: C.cyan, animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`, opacity: 0.4 }} />))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <div style={{ display: "flex", gap: 10, padding: "14px 18px", background: C.surface, borderTop: `1px solid ${C.border}` }}>
-        <input
+      {/* Input — textarea that wraps */}
+      <div style={{ display: "flex", gap: 8, padding: "10px 14px", background: C.surface, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           placeholder="Message Cadence..."
           disabled={sending}
+          rows={1}
           style={{
             flex: 1, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 10,
             padding: "10px 14px", color: C.text, fontSize: 13, outline: "none",
+            resize: "none", overflow: "hidden", lineHeight: 1.5,
+            fontFamily: "inherit", minHeight: 42, maxHeight: 120,
           }}
         />
-        <button
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          style={{
-            width: 42, height: 42, borderRadius: 10, border: "none", cursor: "pointer",
-            background: input.trim() ? `linear-gradient(135deg, ${C.accent}, ${C.cyan})` : C.surfaceHi,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            opacity: input.trim() ? 1 : 0.4, transition: "all 0.2s",
-          }}
-        >
+        <button onClick={handleSend} disabled={sending || !input.trim()} style={{
+          width: 42, height: 42, borderRadius: 10, border: "none", cursor: "pointer", flexShrink: 0,
+          background: input.trim() ? `linear-gradient(135deg, ${C.accent}, ${C.cyan})` : C.surfaceHi,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: input.trim() ? 1 : 0.4, transition: "all 0.2s",
+        }}>
           <SendIc size={16} color={input.trim() ? "#fff" : C.textDim} />
         </button>
       </div>
@@ -881,8 +683,7 @@ export default function CadenceCommandCenter() {
     return () => clearInterval(t);
   }, []);
 
-  const openTasks = d.tasks.filter(t => t.status !== "completed" && t.status !== "failed").length;
-  const critTasks = d.tasks.filter(t => t.priority <= 2 && t.status !== "completed").length;
+  const openTasks = d.cadenceHeartbeat.filter(t => t.status !== "completed" && t.status !== "failed").length;
   const prioLabel = (p: number) => p <= 2 ? "critical" : p <= 4 ? "high" : p <= 6 ? "normal" : "low";
   const prioColor = (p: number) => p <= 2 ? C.red : p <= 4 ? C.yellow : C.textMuted;
   const statusColor = (s: string) => s === "completed" ? C.green : s === "in_progress" ? C.cyan : C.textDim;
@@ -892,7 +693,7 @@ export default function CadenceCommandCenter() {
     { id: "dashboard", icon: Activity, label: "Dashboard" },
     { id: "training", icon: Dumbbell, label: "Training" },
     { id: "chat", icon: MsgCircle, label: "Chat" },
-    { id: "conn", icon: Brain, label: "Conn" },
+    { id: "cadence", icon: Shield, label: "Cadence" },
   ];
 
   if (d.loading) {
@@ -906,9 +707,9 @@ export default function CadenceCommandCenter() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex", flexDirection: "column" }}>
-      {/* Main content area */}
-      <main style={{ flex: 1, overflowY: "auto", paddingBottom: 70, padding: "20px" }}>
-        {/* DASHBOARD TAB */}
+      <main style={{ flex: 1, overflowY: "auto", paddingBottom: 70, padding: activeTab === "chat" ? "0 0 56px 0" : "20px 20px 70px 20px" }}>
+
+        {/* ══════════ DASHBOARD TAB ══════════ */}
         {activeTab === "dashboard" && (
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             {/* Header */}
@@ -919,21 +720,22 @@ export default function CadenceCommandCenter() {
                   <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Cadence</span>
                 </div>
                 <div style={{ fontSize: 12, color: C.textMuted }}>
-                  {time.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  {time.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Denver" })} · {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "America/Denver" })}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: 1 }}>GENESIS RACE</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, lineHeight: 1.1 }}>{d.genesisCountdown} <span style={{ fontSize: 12, fontWeight: 400, color: C.textDim }}>days</span></div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, lineHeight: 1.1 }}>{d.raceCountdown} <span style={{ fontSize: 12, fontWeight: 400, color: C.textDim }}>days</span></div>
+                <div style={{ fontSize: 9, color: C.textDim }}>May 30, 2026</div>
               </div>
             </div>
 
             {/* Quick stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-              <StatCard icon={Target} label="Tasks" value={openTasks} color={C.accent} sub={critTasks > 0 ? `${critTasks} crit` : "clear"} />
-              <StatCard icon={Dumbbell} label="Day" value={`D${d.currentDay}`} color={C.green} sub={`${d.totalDays > 0 ? Math.round((d.completedDays / d.totalDays) * 100) : 0}%`} />
-              <StatCard icon={Dollar} label="Today" value={`$${d.todayCost.toFixed(2)}`} color={C.cyan} sub="$10/day budget" />
-              <StatCard icon={Brain} label="Memory" value={d.memories.length} color={C.purple} sub={`${d.memories.filter(m => m.category === "core").length} core`} />
+              <StatCard icon={Dumbbell} label="Training" value={`Day ${d.currentDay}`} color={C.green} sub={`${d.totalDays > 0 ? Math.round((d.completedDays / d.totalDays) * 100) : 0}% complete`} />
+              <StatCard icon={Dollar} label="Today" value={`$${d.todayCost.toFixed(3)}`} color={C.cyan} sub="$10/day budget" />
+              <StatCard icon={Target} label="Tasks" value={openTasks} color={C.accent} sub={openTasks > 0 ? "active" : "clear"} />
+              <StatCard icon={Brain} label="Memory" value={d.cadenceMemory.length} color={C.purple} sub={`${d.cadenceMemory.filter(m => m.category === "core").length} core`} />
             </div>
 
             {/* Nutrition Today */}
@@ -942,27 +744,15 @@ export default function CadenceCommandCenter() {
               <MacroBar label="Fat" value={d.nutritionTotals.fat} target={140} color={C.gold} />
               <MacroBar label="Net Carbs" value={d.nutritionTotals.netCarbs} target={30} color={C.green} />
               <MacroBar label="Calories" value={d.nutritionTotals.calories} target={2200} unit="kcal" color={C.cyan} />
-              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                <button
-                  onClick={() => setShowNutritionForm(!showNutritionForm)}
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    background: "transparent",
-                    color: C.textSoft,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {showNutritionForm ? "Cancel" : "+ Add Meal"}
-                </button>
-              </div>
+              <button onClick={() => setShowNutritionForm(!showNutritionForm)} style={{
+                width: "100%", padding: "10px", borderRadius: 8, border: `1px solid ${C.border}`, marginTop: 14,
+                background: "transparent", color: C.textSoft, cursor: "pointer", fontSize: 12, fontWeight: 600,
+              }}>
+                {showNutritionForm ? "Cancel" : "+ Add Meal"}
+              </button>
               {showNutritionForm && <NutritionForm onSuccess={() => { setShowNutritionForm(false); d.refetchAll(); }} />}
               {d.nutritionMeals.length > 0 && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}15` }}>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>Meals Logged</div>
                   {d.nutritionMeals.map(m => (
                     <div key={m.id} style={{ fontSize: 11, color: C.textSoft, padding: "6px 0", borderBottom: `1px solid ${C.border}15` }}>
@@ -983,50 +773,47 @@ export default function CadenceCommandCenter() {
                 <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 6 }}>{Number(d.latestBody.weight_lbs).toFixed(1)} <span style={{ fontSize: 14, fontWeight: 400, color: C.textMuted }}>lbs</span></div>
                 {d.latestBody.body_fat_percentage && <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>BF: {Number(d.latestBody.body_fat_percentage).toFixed(1)}%</div>}
                 {d.latestBody.resting_heart_rate && <div style={{ fontSize: 13, color: C.red, marginBottom: 12 }}>RHR: {d.latestBody.resting_heart_rate} bpm</div>}
-                <button
-                  onClick={() => setShowBodyMetricsForm(!showBodyMetricsForm)}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    background: "transparent",
-                    color: C.textSoft,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
+                <button onClick={() => setShowBodyMetricsForm(!showBodyMetricsForm)} style={{
+                  width: "100%", padding: "10px", borderRadius: 8, border: `1px solid ${C.border}`,
+                  background: "transparent", color: C.textSoft, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                }}>
                   {showBodyMetricsForm ? "Cancel" : "+ Log Metrics"}
                 </button>
                 {showBodyMetricsForm && <BodyMetricsForm onSuccess={() => { setShowBodyMetricsForm(false); d.refetchAll(); }} />}
               </Panel>
             )}
 
-            {/* Training Status */}
-            <Panel title="Genesis Training" icon={Dumbbell} color={C.green} action={<span style={{ fontSize: 11, color: C.cyan }}>{d.genesisCountdown}d to race</span>}>
+            {/* Training Status — today + upcoming */}
+            <Panel title="Genesis Training" icon={Dumbbell} color={C.green} action={
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: 11, color: C.cyan }}>{d.trainingEndCountdown}d to program end</span>
+              </div>
+            }>
               <div style={{ marginBottom: 14 }}>
                 <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={7} label="Progress" />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
                   <span style={{ fontSize: 10, color: C.textDim }}>{d.completedDays} of {d.totalDays} days</span>
-                  <span style={{ fontSize: 10, color: C.cyan }}>May 3, 2026</span>
+                  <span style={{ fontSize: 10, color: C.textDim }}>Race: May 30 · Program ends: May 3</span>
                 </div>
               </div>
-              {d.training.slice(0, 3).map(t => (
+              {d.trainingNearToday.length > 0 ? d.trainingNearToday.map(t => (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
                   <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, color: C.text }}>{t.workout_name}</div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus}</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus} · {t.phase} Wk{t.week}</div>
                   </div>
+                  <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   {t.completed && <CheckCirc size={15} color={C.green} />}
                 </div>
-              ))}
+              )) : (
+                <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No training data for today</div>
+              )}
             </Panel>
           </div>
         )}
 
-        {/* TRAINING TAB */}
+        {/* ══════════ TRAINING TAB ══════════ */}
         {activeTab === "training" && (
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             <Panel title="Genesis Training Log" icon={Dumbbell} color={C.green}>
@@ -1034,10 +821,10 @@ export default function CadenceCommandCenter() {
                 <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={8} label="Overall Progress" />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
                   <span style={{ fontSize: 11, color: C.textDim }}>{d.completedDays} of {d.totalDays} completed</span>
-                  <span style={{ fontSize: 11, color: C.cyan, fontWeight: 600 }}>{d.genesisCountdown} days to race</span>
+                  <span style={{ fontSize: 11, color: C.cyan, fontWeight: 600 }}>{d.raceCountdown}d to race · {d.trainingEndCountdown}d to program end</span>
                 </div>
               </div>
-              {d.training.map(t => (
+              {d.trainingAll.map(t => (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
                   <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
                   <div style={{ flex: 1 }}>
@@ -1045,7 +832,7 @@ export default function CadenceCommandCenter() {
                     <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus} · {t.phase} Wk{t.week}</div>
                     {t.notes && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, fontStyle: "italic" }}>{t.notes.length > 80 ? t.notes.slice(0, 80) + "…" : t.notes}</div>}
                   </div>
-                  <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   {t.completed && <CheckCirc size={15} color={C.green} />}
                 </div>
               ))}
@@ -1053,18 +840,18 @@ export default function CadenceCommandCenter() {
           </div>
         )}
 
-        {/* CHAT TAB */}
+        {/* ══════════ CHAT TAB ══════════ */}
         {activeTab === "chat" && (
-          <ChatWindow status={agentStatus} onDataChanged={d.refetchAll} />
+          <ChatWindow status={agentStatus} onDataChanged={d.refetchAll} todayCost={d.todayCost} totalTokens={d.totalTokens} />
         )}
 
-        {/* CONN TAB */}
-        {activeTab === "conn" && (
-          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-            {/* Tasks */}
-            <Panel title="Heartbeat Queue" icon={Target} color={C.accent} action={<span style={{ fontSize: 11, color: C.textDim }}>{openTasks} open</span>}>
-              {d.tasks.filter(t => t.status !== "completed").length > 0 ? (
-                d.tasks.filter(t => t.status !== "completed").map(t => {
+        {/* ══════════ CADENCE TAB ══════════ */}
+        {activeTab === "cadence" && (
+          <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Cadence Heartbeat */}
+            <Panel title="Cadence Tasks" icon={Target} color={C.accent} action={<span style={{ fontSize: 11, color: C.textDim }}>{openTasks} open</span>}>
+              {d.cadenceHeartbeat.filter(t => t.status !== "completed").length > 0 ? (
+                d.cadenceHeartbeat.filter(t => t.status !== "completed").map(t => {
                   const SI = StatusIcon(t.status);
                   return (
                     <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
@@ -1082,16 +869,20 @@ export default function CadenceCommandCenter() {
               )}
             </Panel>
 
-            {/* Memory Bank */}
-            <Panel title="Memory Bank" icon={Brain} color={C.purple} action={<span style={{ fontSize: 11, color: C.textDim }}>{d.memories.length} entries</span>}>
-              {d.memories.length > 0 ? (
-                d.memories.map(m => (
+            {/* Cadence Memory */}
+            <Panel title="Cadence Memory" icon={Brain} color={C.purple} action={<span style={{ fontSize: 11, color: C.textDim }}>{d.cadenceMemory.length} entries</span>}>
+              {d.cadenceMemory.length > 0 ? (
+                d.cadenceMemory.map(m => (
                   <div key={m.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{m.key.replace(/_/g, " ")}</span>
-                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${C.purple}15`, color: C.purple, fontWeight: 600 }}>{m.category.replace(/_/g, " ")}</span>
+                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${C.purple}15`, color: C.purple, fontWeight: 600 }}>{m.category}</span>
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
+                        {[...Array(5)].map((_, i) => <div key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: i < m.importance ? C.gold : C.border }} />)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.55 }}>{m.content.length > 150 ? m.content.slice(0, 150) + "…" : m.content}</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.55 }}>{m.content}</div>
+                    {m.tags.length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>{m.tags.map(tag => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${C.accent}10`, color: C.textDim }}>{tag}</span>)}</div>}
                   </div>
                 ))
               ) : (
@@ -1099,11 +890,11 @@ export default function CadenceCommandCenter() {
               )}
             </Panel>
 
-            {/* Soul Directives */}
-            <Panel title="Soul Directives" icon={Shield} color={C.gold}>
-              {d.soul.length > 0 ? (
+            {/* Cadence Soul */}
+            <Panel title="Cadence Soul" icon={Shield} color={C.gold}>
+              {d.cadenceSoul.length > 0 ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  {d.soul.map(s => (
+                  {d.cadenceSoul.map(s => (
                     <div key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, padding: "7px 14px", borderRadius: 20, background: `${C.cyan}08`, border: `1px solid ${C.cyan}18`, color: C.textSoft }}>
                       <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.cyan }} />
                       {s.directive}
@@ -1115,13 +906,13 @@ export default function CadenceCommandCenter() {
               )}
             </Panel>
 
-            {/* Identity */}
+            {/* Cadence Identity */}
             <Panel title="Cadence Identity" icon={Zap} color={C.green}>
               {d.cadenceIdentity.length > 0 ? (
-                d.cadenceIdentity.slice(0, 10).map(item => (
+                d.cadenceIdentity.map(item => (
                   <div key={item.id} style={{ display: "flex", padding: "9px 0", borderBottom: `1px solid ${C.border}15` }}>
                     <span style={{ fontSize: 11, color: C.textDim, width: 120, flexShrink: 0 }}>{item.key.replace(/_/g, " ")}</span>
-                    <span style={{ fontSize: 12, color: C.textSoft }}>{item.value.length > 100 ? item.value.slice(0, 100) + "…" : item.value}</span>
+                    <span style={{ fontSize: 12, color: C.textSoft }}>{item.value}</span>
                   </div>
                 ))
               ) : (
@@ -1134,39 +925,21 @@ export default function CadenceCommandCenter() {
 
       {/* BOTTOM TAB NAVIGATION */}
       <nav style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 56,
-        background: C.surface,
-        borderTop: `1px solid ${C.border}`,
-        display: "flex",
-        justifyContent: "space-around",
-        alignItems: "center",
-        zIndex: 100,
+        position: "fixed", bottom: 0, left: 0, right: 0, height: 56,
+        background: C.surface, borderTop: `1px solid ${C.border}`,
+        display: "flex", justifyContent: "space-around", alignItems: "center", zIndex: 100,
       }}>
         {navItems.map(item => {
           const active = activeTab === item.id;
           return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              style={{
-                flex: 1,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                background: active ? `${C.accent}06` : "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderTop: active ? `2px solid ${C.cyan}` : "none",
-                transition: "all 0.2s",
-              }}
-            >
+            <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+              flex: 1, height: "100%", display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 4,
+              background: active ? `${C.accent}06` : "transparent",
+              border: "none", cursor: "pointer",
+              borderTop: active ? `2px solid ${C.cyan}` : "2px solid transparent",
+              transition: "all 0.2s",
+            }}>
               <item.icon size={20} color={active ? C.cyan : C.textDim} />
               <span style={{ fontSize: 9, color: active ? C.cyan : C.textDim, fontWeight: active ? 600 : 400 }}>{item.label}</span>
             </button>
@@ -1174,18 +947,10 @@ export default function CadenceCommandCenter() {
         })}
       </nav>
 
-      {/* Global animations */}
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.4; }
           50% { opacity: 0.8; }
-        }
-        .fade-in {
-          animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>

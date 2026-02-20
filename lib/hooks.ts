@@ -9,12 +9,22 @@ import type {
   ConnHeartbeat,
   ConnSessionLog,
   CadenceIdentity,
+  CadenceHeartbeat,
+  CadenceMemory,
+  CadenceSoul,
   TrainingLog,
   NutritionMeal,
   BodyMetric,
   WifeMealPlan,
   ChatMessage,
 } from "./supabase";
+
+/* ═══════════════════════════════════════════════════════════════
+   MST helper — Rory's timezone is America/Denver
+   ═══════════════════════════════════════════════════════════════ */
+function getMSTDate(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" }); // YYYY-MM-DD
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Generic hook for fetching from Supabase
@@ -83,7 +93,7 @@ function useSupabaseQuery<T>(
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Typed hooks for each table — using conn_* schema
+   Typed hooks — Conn agent tables
    ═══════════════════════════════════════════════════════════════ */
 
 export function useMemories() {
@@ -105,12 +115,6 @@ export function useConnIdentity() {
   });
 }
 
-export function useCadenceIdentity() {
-  return useSupabaseQuery<CadenceIdentity>("cadence_identity", {
-    order: { column: "category", ascending: true },
-  });
-}
-
 export function useTasks() {
   return useSupabaseQuery<ConnHeartbeat>("conn_heartbeat", {
     order: { column: "created_at", ascending: false },
@@ -124,21 +128,48 @@ export function useSessionLogs() {
   });
 }
 
-export function useTrainingLog() {
-  return useSupabaseQuery<TrainingLog>("training_log", {
-    order: { column: "day_number", ascending: false },
-    limit: 10,
+/* ═══════════════════════════════════════════════════════════════
+   Typed hooks — Cadence agent tables
+   ═══════════════════════════════════════════════════════════════ */
+
+export function useCadenceIdentity() {
+  return useSupabaseQuery<CadenceIdentity>("cadence_identity", {
+    order: { column: "category", ascending: true },
   });
 }
 
-export function useTrainingStats() {
+export function useCadenceHeartbeat() {
+  return useSupabaseQuery<CadenceHeartbeat>("cadence_heartbeat", {
+    order: { column: "created_at", ascending: false },
+  });
+}
+
+export function useCadenceMemory() {
+  return useSupabaseQuery<CadenceMemory>("cadence_memory", {
+    order: { column: "importance", ascending: false },
+  });
+}
+
+export function useCadenceSoul() {
+  return useSupabaseQuery<CadenceSoul>("cadence_soul", {
+    order: { column: "priority", ascending: true },
+    filter: { column: "active", op: "eq", value: true },
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Typed hooks — Training & wellness
+   ═══════════════════════════════════════════════════════════════ */
+
+export function useTrainingLog() {
+  // Fetch around current day — ascending from today's area
   return useSupabaseQuery<TrainingLog>("training_log", {
-    order: { column: "day_number", ascending: false },
+    order: { column: "day_number", ascending: true },
   });
 }
 
 export function useNutritionToday() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getMSTDate();
   return useSupabaseQuery<NutritionMeal>("nutrition_meals", {
     order: { column: "time_logged", ascending: true },
     filter: { column: "date", op: "eq", value: today },
@@ -176,9 +207,11 @@ export function useDashboardData() {
   const soul = useSoul();
   const connIdentity = useConnIdentity();
   const cadenceIdentity = useCadenceIdentity();
+  const cadenceHeartbeat = useCadenceHeartbeat();
+  const cadenceMemory = useCadenceMemory();
+  const cadenceSoul = useCadenceSoul();
   const tasks = useTasks();
-  const training = useTrainingLog();
-  const trainingAll = useTrainingStats();
+  const trainingAll = useTrainingLog();
   const nutrition = useNutritionToday();
   const body = useBodyMetrics();
   const sessions = useSessionLogs();
@@ -190,16 +223,29 @@ export function useDashboardData() {
     soul.loading ||
     connIdentity.loading ||
     tasks.loading ||
-    training.loading ||
+    trainingAll.loading ||
     nutrition.loading ||
     body.loading;
 
-  // Training progress
-  const completedDays = trainingAll.data.filter((d) => d.completed).length;
-  const totalDays = trainingAll.data.length || 98;
-  const currentDay = trainingAll.data.length > 0
-    ? Math.max(...trainingAll.data.map((d) => d.day_number))
-    : 0;
+  // Training progress — find current day by matching today's MST date
+  const todayMST = getMSTDate();
+  const allTraining = trainingAll.data;
+  const completedDays = allTraining.filter((d) => d.completed).length;
+  const totalDays = allTraining.length || 98;
+
+  // Current day = the training_log entry matching today's date, or nearest past
+  const todayEntry = allTraining.find((d) => d.date === todayMST);
+  const currentDay = todayEntry
+    ? todayEntry.day_number
+    : allTraining.filter((d) => d.date <= todayMST).length > 0
+      ? allTraining.filter((d) => d.date <= todayMST).slice(-1)[0].day_number
+      : 0;
+
+  // Training entries near today (for dashboard preview: today + next few)
+  const todayIdx = allTraining.findIndex((d) => d.date === todayMST);
+  const trainingNearToday = todayIdx >= 0
+    ? allTraining.slice(todayIdx, todayIdx + 5)
+    : allTraining.filter((d) => d.date >= todayMST).slice(0, 5);
 
   // Today's nutrition totals
   const nutritionTotals = {
@@ -213,16 +259,23 @@ export function useDashboardData() {
   // Latest body metric
   const latestBody = body.data[0] || null;
 
-  // Genesis countdown
-  const genesisDate = new Date("2026-05-03");
-  const genesisCountdown = Math.ceil(
-    (genesisDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  // Genesis Race countdown — race is May 30, 2026 (training ends May 3)
+  const raceDate = new Date("2026-05-30");
+  const trainingEndDate = new Date("2026-05-03");
+  const raceCountdown = Math.ceil(
+    (raceDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  );
+  const trainingEndCountdown = Math.ceil(
+    (trainingEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
 
-  // Chat cost calculation
-  const today = new Date().toISOString().split("T")[0];
+  // Chat cost calculation — using MST calendar day
   const todayCost = chatCosts.data
-    .filter((m) => m.created_at.startsWith(today))
+    .filter((m) => {
+      // Convert created_at to MST date string
+      const msgDate = new Date(m.created_at).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+      return msgDate === todayMST;
+    })
     .reduce((sum, m) => {
       const pricing = MODEL_PRICING[m.model_used || ""] || { input: 3, output: 15 };
       const inCost = ((m.tokens_in || 0) / 1_000_000) * pricing.input;
@@ -247,8 +300,10 @@ export function useDashboardData() {
     soul.refetch();
     connIdentity.refetch();
     cadenceIdentity.refetch();
+    cadenceHeartbeat.refetch();
+    cadenceMemory.refetch();
+    cadenceSoul.refetch();
     tasks.refetch();
-    training.refetch();
     trainingAll.refetch();
     nutrition.refetch();
     body.refetch();
@@ -258,25 +313,34 @@ export function useDashboardData() {
   };
 
   return {
+    // Conn agent data
     memories: memories.data,
     soul: soul.data,
     connIdentity: connIdentity.data,
-    cadenceIdentity: cadenceIdentity.data,
     tasks: tasks.data,
-    training: training.data,
     sessions: sessions.data,
+    // Cadence agent data
+    cadenceIdentity: cadenceIdentity.data,
+    cadenceHeartbeat: cadenceHeartbeat.data,
+    cadenceMemory: cadenceMemory.data,
+    cadenceSoul: cadenceSoul.data,
+    // Training & wellness
+    trainingAll: allTraining,
+    trainingNearToday,
     nutritionMeals: nutrition.data,
     nutritionTotals,
     bodyMetrics: body.data,
     latestBody,
     mealPlans: mealPlans.data,
+    // Computed
     completedDays,
     totalDays,
     currentDay,
     todayCost,
     totalCost,
     totalTokens,
-    genesisCountdown,
+    raceCountdown,
+    trainingEndCountdown,
     loading,
     refetchAll,
   };

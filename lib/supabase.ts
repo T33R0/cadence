@@ -80,12 +80,50 @@ export type ConnSessionLog = {
   created_at: string;
 };
 
-// Cadence identity (dashboard personality)
+// Cadence agent tables (dashboard personality + agent data)
 export type CadenceIdentity = {
   id: string;
   key: string;
   value: string;
   category: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CadenceHeartbeat = {
+  id: string;
+  task: string;
+  description: string | null;
+  category: string;
+  priority: number;
+  status: string;
+  scheduled_for: string | null;
+  recurrence: string | null;
+  result: string | null;
+  error: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CadenceMemory = {
+  id: string;
+  key: string;
+  content: string;
+  category: string;
+  tags: string[];
+  importance: number;
+  source_session: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CadenceSoul = {
+  id: string;
+  directive: string;
+  category: string;
+  priority: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
 };
