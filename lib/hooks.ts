@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "./supabase";
+import { supabase, MODEL_PRICING } from "./supabase";
 import type {
-  PulseMemory,
-  PulseSoul,
-  PulseIdentity,
-  PulseHeartbeat,
-  PulseCostLog,
-  PulseSessionLog,
+  ConnMemory,
+  ConnSoul,
+  ConnIdentity,
+  ConnHeartbeat,
+  ConnSessionLog,
+  CadenceIdentity,
   TrainingLog,
   NutritionMeal,
   BodyMetric,
+  WifeMealPlan,
+  ChatMessage,
 } from "./supabase";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -24,6 +26,7 @@ function useSupabaseQuery<T>(
     order?: { column: string; ascending?: boolean };
     limit?: number;
     filter?: { column: string; op: string; value: any };
+    filters?: { column: string; op: string; value: any }[];
   }
 ) {
   const [data, setData] = useState<T[]>([]);
@@ -42,6 +45,12 @@ function useSupabaseQuery<T>(
         options.filter.op,
         options.filter.value
       );
+    }
+
+    if (options?.filters) {
+      for (const f of options.filters) {
+        query = query.filter(f.column, f.op, f.value);
+      }
     }
 
     if (options?.order) {
@@ -74,43 +83,42 @@ function useSupabaseQuery<T>(
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Typed hooks for each table
+   Typed hooks for each table — using conn_* schema
    ═══════════════════════════════════════════════════════════════ */
 
 export function useMemories() {
-  return useSupabaseQuery<PulseMemory>("pulse_memory", {
+  return useSupabaseQuery<ConnMemory>("conn_memory", {
     order: { column: "importance", ascending: false },
   });
 }
 
 export function useSoul() {
-  return useSupabaseQuery<PulseSoul>("pulse_soul", {
+  return useSupabaseQuery<ConnSoul>("conn_soul", {
     order: { column: "priority", ascending: true },
     filter: { column: "active", op: "eq", value: true },
   });
 }
 
-export function useIdentity() {
-  return useSupabaseQuery<PulseIdentity>("pulse_identity", {
+export function useConnIdentity() {
+  return useSupabaseQuery<ConnIdentity>("conn_identity", {
+    order: { column: "category", ascending: true },
+  });
+}
+
+export function useCadenceIdentity() {
+  return useSupabaseQuery<CadenceIdentity>("cadence_identity", {
     order: { column: "category", ascending: true },
   });
 }
 
 export function useTasks() {
-  return useSupabaseQuery<PulseHeartbeat>("pulse_heartbeat", {
+  return useSupabaseQuery<ConnHeartbeat>("conn_heartbeat", {
     order: { column: "created_at", ascending: false },
-  });
-}
-
-export function useCostLog() {
-  return useSupabaseQuery<PulseCostLog>("pulse_cost_log", {
-    order: { column: "created_at", ascending: false },
-    limit: 20,
   });
 }
 
 export function useSessionLogs() {
-  return useSupabaseQuery<PulseSessionLog>("pulse_session_logs", {
+  return useSupabaseQuery<ConnSessionLog>("conn_session_logs", {
     order: { column: "created_at", ascending: false },
     limit: 10,
   });
@@ -144,46 +152,56 @@ export function useBodyMetrics() {
   });
 }
 
+export function useWifeMealPlans() {
+  return useSupabaseQuery<WifeMealPlan>("wife_meal_plans", {
+    order: { column: "week_start_date", ascending: false },
+    limit: 14,
+  });
+}
+
+export function useChatCosts() {
+  return useSupabaseQuery<ChatMessage>("chat_messages", {
+    select: "id,tokens_in,tokens_out,model_used,created_at,session_id",
+    order: { column: "created_at", ascending: false },
+    limit: 100,
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   Derived / computed data hooks
+   Master dashboard hook — aggregates all data
    ═══════════════════════════════════════════════════════════════ */
 
 export function useDashboardData() {
   const memories = useMemories();
   const soul = useSoul();
-  const identity = useIdentity();
+  const connIdentity = useConnIdentity();
+  const cadenceIdentity = useCadenceIdentity();
   const tasks = useTasks();
-  const costLog = useCostLog();
   const training = useTrainingLog();
   const trainingAll = useTrainingStats();
   const nutrition = useNutritionToday();
   const body = useBodyMetrics();
   const sessions = useSessionLogs();
+  const mealPlans = useWifeMealPlans();
+  const chatCosts = useChatCosts();
 
   const loading =
     memories.loading ||
     soul.loading ||
-    identity.loading ||
+    connIdentity.loading ||
     tasks.loading ||
-    costLog.loading ||
     training.loading ||
     nutrition.loading ||
     body.loading;
 
-  // Compute training progress
+  // Training progress
   const completedDays = trainingAll.data.filter((d) => d.completed).length;
   const totalDays = trainingAll.data.length || 98;
   const currentDay = trainingAll.data.length > 0
     ? Math.max(...trainingAll.data.map((d) => d.day_number))
     : 0;
 
-  // Compute today's cost
-  const today = new Date().toISOString().split("T")[0];
-  const todayCost = costLog.data
-    .filter((c) => c.session_date === today)
-    .reduce((sum, c) => sum + (Number(c.cost_usd) || 0), 0);
-
-  // Compute today's nutrition totals
+  // Today's nutrition totals
   const nutritionTotals = {
     calories: nutrition.data.reduce((s, m) => s + (Number(m.calories) || 0), 0),
     protein: nutrition.data.reduce((s, m) => s + (Number(m.protein_g) || 0), 0),
@@ -201,35 +219,63 @@ export function useDashboardData() {
     (genesisDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
 
+  // Chat cost calculation
+  const today = new Date().toISOString().split("T")[0];
+  const todayCost = chatCosts.data
+    .filter((m) => m.created_at.startsWith(today))
+    .reduce((sum, m) => {
+      const pricing = MODEL_PRICING[m.model_used || ""] || { input: 3, output: 15 };
+      const inCost = ((m.tokens_in || 0) / 1_000_000) * pricing.input;
+      const outCost = ((m.tokens_out || 0) / 1_000_000) * pricing.output;
+      return sum + inCost + outCost;
+    }, 0);
+
+  const totalCost = chatCosts.data.reduce((sum, m) => {
+    const pricing = MODEL_PRICING[m.model_used || ""] || { input: 3, output: 15 };
+    const inCost = ((m.tokens_in || 0) / 1_000_000) * pricing.input;
+    const outCost = ((m.tokens_out || 0) / 1_000_000) * pricing.output;
+    return sum + inCost + outCost;
+  }, 0);
+
+  const totalTokens = chatCosts.data.reduce(
+    (sum, m) => sum + (m.tokens_in || 0) + (m.tokens_out || 0),
+    0
+  );
+
   const refetchAll = () => {
     memories.refetch();
     soul.refetch();
-    identity.refetch();
+    connIdentity.refetch();
+    cadenceIdentity.refetch();
     tasks.refetch();
-    costLog.refetch();
     training.refetch();
     trainingAll.refetch();
     nutrition.refetch();
     body.refetch();
     sessions.refetch();
+    mealPlans.refetch();
+    chatCosts.refetch();
   };
 
   return {
     memories: memories.data,
     soul: soul.data,
-    identity: identity.data,
+    connIdentity: connIdentity.data,
+    cadenceIdentity: cadenceIdentity.data,
     tasks: tasks.data,
-    costLog: costLog.data,
     training: training.data,
     sessions: sessions.data,
     nutritionMeals: nutrition.data,
     nutritionTotals,
     bodyMetrics: body.data,
     latestBody,
+    mealPlans: mealPlans.data,
     completedDays,
     totalDays,
     currentDay,
     todayCost,
+    totalCost,
+    totalTokens,
     genesisCountdown,
     loading,
     refetchAll,

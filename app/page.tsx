@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDashboardData } from "@/lib/hooks";
-import { CHAT_FUNCTION_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
-import type { ChatMessage } from "@/lib/supabase";
+import { CHAT_FUNCTION_URL, SUPABASE_ANON_KEY, supabase } from "@/lib/supabase";
+import type { ChatMessage, NutritionMeal, BodyMetric } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════════════════
    COLOR SYSTEM — Deep ocean + bioluminescence
@@ -31,22 +31,18 @@ const Target = Ic(<><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="
 const Dollar = Ic(<><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>);
 const Dumbbell = Ic(<><path d="m6.5 6.5 11 11" /><path d="m21 21-1-1" /><path d="m3 3 1 1" /><path d="m18 22 4-4" /><path d="m2 6 4-4" /><path d="m3 10 7-7" /><path d="m14 21 7-7" /></>);
 const ClockIc = Ic(<><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>);
-const AlertTri = Ic(<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>);
 const CheckCirc = Ic(<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>);
 const Circ = Ic(<circle cx="12" cy="12" r="10" />);
 const SendIc = Ic(<><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></>);
 const Utensils = Ic(<><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3v7" /></>);
 const TrendUp = Ic(<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></>);
 const Shield = Ic(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />);
-const CpuIc = Ic(<><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /></>);
-const DbIc = Ic(<><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></>);
-const Refresh = Ic(<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>);
 const MsgCircle = Ic(<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>);
+const Plus = Ic(<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>);
+const X = Ic(<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>);
 
 /* ═══════════════════════════════════════════════════════════════
    CADENCE AVATAR — The Living Pulse Ring
-   A toroidal ring with traveling sine wave displacement.
-   Precision biometrics aesthetic. No face, no anthropomorphism.
    ═══════════════════════════════════════════════════════════════ */
 const CAD = {
   base: "#00E5CC",       // cyan-teal
@@ -82,12 +78,11 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
     canvas.style.height = size + "px";
     ctx.scale(dpr, dpr);
     const cx = size / 2, cy = size / 2;
-    const ringR = size * 0.30;       // torus major radius (60% of canvas → radius = 30%)
-    const tubeR = size * 0.055;      // torus tube radius
-    const TILT_X = 0.26;             // ~15° tilt on X axis
-    const SEGMENTS = 180;            // ring resolution
+    const ringR = size * 0.30;
+    const tubeR = size * 0.055;
+    const TILT_X = 0.26;
+    const SEGMENTS = 180;
 
-    // Particles — sparse data points
     const particles: { angle: number; vAngle: number; dist: number; sz: number; opacity: number }[] = [];
     for (let i = 0; i < 8; i++) {
       particles.push({
@@ -99,18 +94,16 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       });
     }
 
-    // Success ping state
     let successPingT = -1;
 
     function getStateParams(s: string) {
-      // Returns: rotSpeed (rad/s), pulseFreq (Hz), pulseAmp (0-1), color rgb, glowIntensity, harmonic2
       if (s === "thinking") return {
-        rotSpeed: Math.PI * 2 / 4,  // 4s rotation (2x normal)
-        pulseFreq: 2.5,             // 2-3 per second
+        rotSpeed: Math.PI * 2 / 4,
+        pulseFreq: 2.5,
         pulseAmp: 0.7,
-        color: [123, 97, 255] as number[],   // violet
+        color: [123, 97, 255] as number[],
         glowIntensity: 1.4,
-        harmonic2: 0.35,            // second harmonic overlay
+        harmonic2: 0.35,
         particleCount: 18,
         particleOrbit: true,
       };
@@ -126,25 +119,24 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       };
       if (s === "error") return {
         rotSpeed: Math.PI * 2 / 8,
-        pulseFreq: 4.0,             // fast sharp pulse
+        pulseFreq: 4.0,
         pulseAmp: 1.0,
-        color: [255, 61, 90] as number[],    // arterial red
+        color: [255, 61, 90] as number[],
         glowIntensity: 1.2,
         harmonic2: 0,
         particleCount: 5,
         particleOrbit: false,
       };
       if (s === "idle") return {
-        rotSpeed: Math.PI * 2 / 8,  // 8s rotation
-        pulseFreq: 1.0,             // resting heartbeat — once per second
+        rotSpeed: Math.PI * 2 / 8,
+        pulseFreq: 1.0,
         pulseAmp: 0.25,
-        color: [0, 229 * 0.7, 204 * 0.7] as number[],  // teal at 70%
+        color: [0, 229 * 0.7, 204 * 0.7] as number[],
         glowIntensity: 0.5,
         harmonic2: 0,
         particleCount: 6,
         particleOrbit: false,
       };
-      // "online" default
       return {
         rotSpeed: Math.PI * 2 / 8,
         pulseFreq: 1.0,
@@ -162,10 +154,10 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
 
     function draw(ts: number) {
       if (!startTimeRef.current) startTimeRef.current = ts;
-      const elapsed = (ts - startTimeRef.current) / 1000; // seconds
+      const elapsed = (ts - startTimeRef.current) / 1000;
       const s = stateRef.current.status;
-      const transT = Math.min(1, (ts - stateRef.current.transitionStart) / 400); // 400ms transition
-      const easeT = transT < 1 ? transT * transT * (3 - 2 * transT) : 1; // smoothstep
+      const transT = Math.min(1, (ts - stateRef.current.transitionStart) / 400);
+      const easeT = transT < 1 ? transT * transT * (3 - 2 * transT) : 1;
 
       const cur = getStateParams(s);
       const prev = getStateParams(stateRef.current.prevStatus);
@@ -176,25 +168,18 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       const glowI = lerp(prev.glowIntensity, cur.glowIntensity, easeT);
       const harm2 = lerp(prev.harmonic2, cur.harmonic2, easeT);
 
-      // Success ping trigger
       if (s === "success" && stateRef.current.prevStatus !== "success" && transT < 0.1) {
         successPingT = elapsed;
       }
 
       ctx.clearRect(0, 0, size, size);
-
-      // Background — near-black
       ctx.fillStyle = CAD.bg;
       ctx.fillRect(0, 0, size, size);
 
-      // Vertical idle oscillation (±2px, 4s cycle)
       const yOsc = Math.sin(elapsed * Math.PI * 2 / 4) * 2;
       const ccy = cy + yOsc;
-
-      // Ring rotation angle
       const rotAngle = elapsed * rotSpeed;
 
-      // ---- AURA GLOW ----
       const glowR = ringR + tubeR * 1.15;
       const auraGrad = ctx.createRadialGradient(cx, ccy, ringR * 0.6, cx, ccy, glowR * 1.3);
       auraGrad.addColorStop(0, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.06 * glowI})`);
@@ -203,26 +188,18 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       ctx.fillStyle = auraGrad;
       ctx.beginPath(); ctx.arc(cx, ccy, glowR * 1.3, 0, Math.PI * 2); ctx.fill();
 
-      // ---- TORUS RING (2.5D approximation) ----
-      // Draw the ring as a series of segments with varying thickness + lighting to simulate 3D torus
-      // Light source from upper-left
-      const lightAngle = -Math.PI * 0.75;  // upper-left
+      const lightAngle = -Math.PI * 0.75;
 
-      // First pass: ring fill with depth shading
       for (let i = 0; i < SEGMENTS; i++) {
         const a1 = (i / SEGMENTS) * Math.PI * 2;
         const a2 = ((i + 1) / SEGMENTS) * Math.PI * 2;
 
-        // Torus Y displacement for tilt (simulates 3D tilt on X axis)
         const tiltY1 = Math.sin(a1) * TILT_X;
         const tiltY2 = Math.sin(a2) * TILT_X;
 
-        // Sine wave displacement — the traveling pulse
         const pulsePhase = a1 - elapsed * pulseFreq * Math.PI * 2;
         const displacement = Math.sin(pulsePhase) * pulseAmp * tubeR;
-        // Second harmonic (thinking state)
         const displacement2 = Math.sin(pulsePhase * 2.3 + 0.5) * harm2 * tubeR;
-        // Error state: sawtooth-ish spike
         let errorSpike = 0;
         if (s === "error" && transT < 0.8) {
           const sawPhase = ((a1 - elapsed * 8) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
@@ -230,7 +207,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         }
         const totalDisp = displacement + displacement2 + errorSpike;
 
-        // Ring position with rotation
         const ra1 = a1 + rotAngle;
         const ra2 = a2 + rotAngle;
         const x1 = cx + Math.cos(ra1) * (ringR + totalDisp);
@@ -238,17 +214,14 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         const x2 = cx + Math.cos(ra2) * (ringR + totalDisp);
         const y2 = ccy + Math.sin(ra2) * (ringR + totalDisp) * (1 - TILT_X * 0.3);
 
-        // Tube thickness varies with viewing angle (torus depth)
-        const depthFactor = 1 + tiltY1 * 0.5; // front of torus is thicker
+        const depthFactor = 1 + tiltY1 * 0.5;
         const currentTube = tubeR * depthFactor * (0.8 + pulseAmp * 0.2 * Math.abs(Math.sin(pulsePhase)));
 
-        // Lighting: dot product of surface normal with light direction
         const normalAngle = ra1;
         const lightDot = Math.cos(normalAngle - lightAngle) * 0.5 + 0.5;
-        const depthLight = (1 + tiltY1) * 0.5; // top of torus is lit, bottom is dark
+        const depthLight = (1 + tiltY1) * 0.5;
         const brightness = 0.2 + lightDot * 0.5 + depthLight * 0.3;
 
-        // Subsurface scattering glow
         const sss = Math.max(0, Math.sin(pulsePhase)) * pulseAmp * 0.4;
 
         const r = Math.round(color[0] * brightness + sss * 40);
@@ -265,7 +238,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         ctx.stroke();
       }
 
-      // ---- INNER GLOW (subsurface scattering on ring) ----
       const innerGlow = ctx.createRadialGradient(cx, ccy, ringR * 0.85, cx, ccy, ringR * 1.15);
       innerGlow.addColorStop(0, "transparent");
       innerGlow.addColorStop(0.4, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.04 * glowI})`);
@@ -274,7 +246,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       ctx.fillStyle = innerGlow;
       ctx.beginPath(); ctx.arc(cx, ccy, ringR * 1.15, 0, Math.PI * 2); ctx.fill();
 
-      // ---- EKG WAVEFORM LINE (outer circumference readout) ----
       ctx.beginPath();
       ctx.strokeStyle = `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.5 * glowI})`;
       ctx.lineWidth = 1;
@@ -291,7 +262,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       }
       ctx.stroke();
 
-      // ---- PULSE GLOW (traveling highlight on ring) ----
       const pulseAngle = rotAngle + elapsed * pulseFreq * Math.PI * 2;
       const px = cx + Math.cos(pulseAngle) * ringR;
       const py = ccy + Math.sin(pulseAngle) * ringR * (1 - TILT_X * 0.3);
@@ -302,7 +272,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       ctx.fillStyle = pulseGlow;
       ctx.beginPath(); ctx.arc(px, py, tubeR * 3, 0, Math.PI * 2); ctx.fill();
 
-      // ---- SUCCESS PING (expanding sonar ring) ----
       if (successPingT > 0) {
         const pingAge = elapsed - successPingT;
         if (pingAge < 1.0) {
@@ -316,7 +285,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
         }
       }
 
-      // ---- PARTICLES (data points) ----
       const activeCount = Math.round(lerp(
         getStateParams(stateRef.current.prevStatus).particleCount,
         cur.particleCount,
@@ -325,7 +293,6 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
       const orbitDir = cur.particleOrbit ? 1 : 0;
       particles.forEach((pt, idx) => {
         if (idx >= activeCount) return;
-        // Orbit or drift lazily inward
         pt.angle += pt.vAngle + orbitDir * rotSpeed * 0.3 * (1 / 60);
         const x = cx + Math.cos(pt.angle) * pt.dist;
         const y = ccy + Math.sin(pt.angle) * pt.dist;
@@ -421,6 +388,218 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   NUTRITION FORM
+   ═══════════════════════════════════════════════════════════════ */
+function NutritionForm({ onSuccess }: { onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+    description: "",
+    meal_type: "lunch",
+    protein: 30,
+    carbs: 20,
+    fat: 15,
+    fiber: 5,
+    calories: 350,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.description.trim()) return;
+    setSubmitting(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { error } = await supabase.from("nutrition_meals").insert({
+        date: today,
+        time_logged: form.time,
+        meal_type: form.meal_type,
+        description: form.description,
+        protein_g: form.protein,
+        carbs_g: form.carbs,
+        net_carbs_g: form.carbs - form.fiber,
+        fat_g: form.fat,
+        fiber_g: form.fiber,
+        calories: form.calories,
+      });
+      if (!error) {
+        setForm({
+          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          description: "",
+          meal_type: "lunch",
+          protein: 30,
+          carbs: 20,
+          fat: 15,
+          fiber: 5,
+          calories: 350,
+        });
+        onSuccess();
+      }
+    } catch (e) {
+      console.error("Nutrition log error:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <input
+          type="time"
+          value={form.time}
+          onChange={e => setForm({ ...form, time: e.target.value })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <select
+          value={form.meal_type}
+          onChange={e => setForm({ ...form, meal_type: e.target.value })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        >
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+          <option value="snack">Snack</option>
+        </select>
+        <input
+          type="text"
+          placeholder="Meal description"
+          value={form.description}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+          style={{ gridColumn: "1 / -1", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Protein (g)"
+          value={form.protein}
+          onChange={e => setForm({ ...form, protein: Number(e.target.value) })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Carbs (g)"
+          value={form.carbs}
+          onChange={e => setForm({ ...form, carbs: Number(e.target.value) })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Fat (g)"
+          value={form.fat}
+          onChange={e => setForm({ ...form, fat: Number(e.target.value) })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Calories"
+          value={form.calories}
+          onChange={e => setForm({ ...form, calories: Number(e.target.value) })}
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={submitting || !form.description.trim()}
+        style={{
+          width: "100%",
+          marginTop: 12,
+          padding: "12px",
+          borderRadius: 8,
+          border: "none",
+          background: C.green,
+          color: "#000",
+          fontWeight: 600,
+          cursor: submitting ? "default" : "pointer",
+          opacity: submitting || !form.description.trim() ? 0.5 : 1,
+        }}
+      >
+        {submitting ? "Saving..." : "Log Meal"}
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BODY METRICS FORM
+   ═══════════════════════════════════════════════════════════════ */
+function BodyMetricsForm({ onSuccess }: { onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    weight_lbs: "",
+    body_fat: "",
+    resting_hr: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.weight_lbs) return;
+    setSubmitting(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { error } = await supabase.from("body_metrics").insert({
+        date: today,
+        weight_lbs: parseFloat(form.weight_lbs),
+        body_fat_percentage: form.body_fat ? parseFloat(form.body_fat) : null,
+        resting_heart_rate: form.resting_hr ? parseInt(form.resting_hr) : null,
+      });
+      if (!error) {
+        setForm({ weight_lbs: "", body_fat: "", resting_hr: "" });
+        onSuccess();
+      }
+    } catch (e) {
+      console.error("Body metrics error:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <input
+          type="number"
+          placeholder="Weight (lbs)"
+          value={form.weight_lbs}
+          onChange={e => setForm({ ...form, weight_lbs: e.target.value })}
+          step="0.1"
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Body Fat %"
+          value={form.body_fat}
+          onChange={e => setForm({ ...form, body_fat: e.target.value })}
+          step="0.1"
+          style={{ padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+        <input
+          type="number"
+          placeholder="Resting HR (bpm)"
+          value={form.resting_hr}
+          onChange={e => setForm({ ...form, resting_hr: e.target.value })}
+          style={{ gridColumn: "1 / -1", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}
+        />
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={submitting || !form.weight_lbs}
+        style={{
+          width: "100%",
+          marginTop: 12,
+          padding: "12px",
+          borderRadius: 8,
+          border: "none",
+          background: C.cyan,
+          color: "#000",
+          fontWeight: 600,
+          cursor: submitting ? "default" : "pointer",
+          opacity: submitting || !form.weight_lbs ? 0.5 : 1,
+        }}
+      >
+        {submitting ? "Saving..." : "Log Metrics"}
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CHAT WITH CADENCE
    ═══════════════════════════════════════════════════════════════ */
 type ChatMsg = { id: string; role: "user" | "assistant"; content: string; created_at: string };
@@ -457,11 +636,9 @@ function useChat(onDataChanged?: () => void) {
     return crypto.randomUUID();
   });
 
-  // Load chat history from DB on mount
   useEffect(() => {
     async function loadHistory() {
       try {
-        const { supabase } = await import("@/lib/supabase");
         const { data, error } = await supabase
           .from("chat_messages")
           .select("id, role, content, created_at")
@@ -514,7 +691,6 @@ function useChat(onDataChanged?: () => void) {
           content: data.reply,
           created_at: new Date().toISOString(),
         }]);
-        // Auto-refresh dashboard data when Cadence used tools (created tasks, saved memories, etc.)
         if (data.tool_calls > 0 && onDataChanged) {
           setTimeout(() => onDataChanged(), 500);
         }
@@ -566,9 +742,9 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", maxHeight: 800 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 100px)", background: C.bg }}>
       {/* Chat header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.surface, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <CadenceAvatar status={status} size={32} />
           <div>
@@ -603,7 +779,7 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, display: "flex", flexDirection: "column", gap: 14 }}>
         {loadingHistory && messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
             <CadenceAvatar status="thinking" size={80} />
@@ -660,7 +836,7 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
       </div>
 
       {/* Input */}
-      <div style={{ display: "flex", gap: 10, padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "0 0 14px 14px" }}>
+      <div style={{ display: "flex", gap: 10, padding: "14px 18px", background: C.surface, borderTop: `1px solid ${C.border}` }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -690,12 +866,14 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN DASHBOARD
+   MAIN DASHBOARD — Mobile-first Bottom Tab Navigation
    ═══════════════════════════════════════════════════════════════ */
 export default function CadenceCommandCenter() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [agentStatus] = useState("online");
   const [time, setTime] = useState(new Date());
+  const [showNutritionForm, setShowNutritionForm] = useState(false);
+  const [showBodyMetricsForm, setShowBodyMetricsForm] = useState(false);
   const d = useDashboardData();
 
   useEffect(() => {
@@ -703,26 +881,20 @@ export default function CadenceCommandCenter() {
     return () => clearInterval(t);
   }, []);
 
-  // Derived data
   const openTasks = d.tasks.filter(t => t.status !== "completed" && t.status !== "failed").length;
   const critTasks = d.tasks.filter(t => t.priority <= 2 && t.status !== "completed").length;
   const prioLabel = (p: number) => p <= 2 ? "critical" : p <= 4 ? "high" : p <= 6 ? "normal" : "low";
   const prioColor = (p: number) => p <= 2 ? C.red : p <= 4 ? C.yellow : C.textMuted;
   const statusColor = (s: string) => s === "completed" ? C.green : s === "in_progress" ? C.cyan : C.textDim;
   const StatusIcon = (s: string) => s === "completed" ? CheckCirc : s === "in_progress" ? ClockIc : Circ;
-  const memTypeColor = (t: string) => t === "core_memory" ? C.green : t === "decision" ? C.gold : t === "skill" ? C.purple : t === "preference" ? C.cyan : C.accent;
 
   const navItems = [
-    { id: "overview", icon: Activity, label: "Overview" },
-    { id: "tasks", icon: Target, label: "Tasks" },
-    { id: "memory", icon: Brain, label: "Memory" },
+    { id: "dashboard", icon: Activity, label: "Dashboard" },
     { id: "training", icon: Dumbbell, label: "Training" },
-    { id: "cost", icon: Dollar, label: "Cost" },
-    { id: "soul", icon: Shield, label: "Soul" },
     { id: "chat", icon: MsgCircle, label: "Chat" },
+    { id: "conn", icon: Brain, label: "Conn" },
   ];
 
-  // Loading state
   if (d.loading) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 20 }}>
@@ -733,65 +905,166 @@ export default function CadenceCommandCenter() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
-      {/* Sidebar */}
-      <nav style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 68, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 18, gap: 2, zIndex: 10 }}>
-        <div style={{ marginBottom: 14 }}><CadenceAvatar status={agentStatus} size={38} /></div>
-        {navItems.map(item => {
-          const active = activeTab === item.id;
-          return (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} title={item.label} style={{ width: 46, height: 46, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: active ? `${C.accent}12` : "transparent", border: active ? `1px solid ${C.accent}25` : "1px solid transparent", cursor: "pointer", position: "relative" }}>
-              <item.icon size={18} color={active ? C.cyan : C.textDim} />
-              {active && <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 20, borderRadius: "0 3px 3px 0", background: C.cyan }} />}
-            </button>
-          );
-        })}
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 18 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, boxShadow: `0 0 8px ${C.green}60` }} />
-          <span style={{ fontSize: 8, color: C.textDim, writingMode: "vertical-lr" as any, transform: "rotate(180deg)" }}>v0.2</span>
-        </div>
-      </nav>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex", flexDirection: "column" }}>
+      {/* Main content area */}
+      <main style={{ flex: 1, overflowY: "auto", paddingBottom: 70, padding: "20px" }}>
+        {/* DASHBOARD TAB */}
+        {activeTab === "dashboard" && (
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                  <CadenceAvatar status={agentStatus} size={40} />
+                  <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Cadence</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.textMuted }}>
+                  {time.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: 1 }}>GENESIS RACE</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, lineHeight: 1.1 }}>{d.genesisCountdown} <span style={{ fontSize: 12, fontWeight: 400, color: C.textDim }}>days</span></div>
+              </div>
+            </div>
 
-      {/* Main */}
-      <main style={{ marginLeft: 68, padding: "24px 30px", maxWidth: 1440 }}>
-        {/* Header */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-              <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Cadence</span>
-              <span style={{ fontSize: 10, padding: "3px 12px", borderRadius: 20, fontWeight: 600, background: `${C.green}12`, color: C.green, border: `1px solid ${C.green}25` }}>● ONLINE</span>
+            {/* Quick stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+              <StatCard icon={Target} label="Tasks" value={openTasks} color={C.accent} sub={critTasks > 0 ? `${critTasks} crit` : "clear"} />
+              <StatCard icon={Dumbbell} label="Day" value={`D${d.currentDay}`} color={C.green} sub={`${d.totalDays > 0 ? Math.round((d.completedDays / d.totalDays) * 100) : 0}%`} />
+              <StatCard icon={Dollar} label="Today" value={`$${d.todayCost.toFixed(2)}`} color={C.cyan} sub="$10/day budget" />
+              <StatCard icon={Brain} label="Memory" value={d.memories.length} color={C.purple} sub={`${d.memories.filter(m => m.category === "core").length} core`} />
             </div>
-            <div style={{ fontSize: 12, color: C.textMuted }}>
-              {time.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })} · {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-            </div>
+
+            {/* Nutrition Today */}
+            <Panel title="Nutrition Today" icon={Utensils} color={C.gold} action={<span style={{ fontSize: 11, color: C.textDim }}>Keto</span>}>
+              <MacroBar label="Protein" value={d.nutritionTotals.protein} target={180} color={C.accent} />
+              <MacroBar label="Fat" value={d.nutritionTotals.fat} target={140} color={C.gold} />
+              <MacroBar label="Net Carbs" value={d.nutritionTotals.netCarbs} target={30} color={C.green} />
+              <MacroBar label="Calories" value={d.nutritionTotals.calories} target={2200} unit="kcal" color={C.cyan} />
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button
+                  onClick={() => setShowNutritionForm(!showNutritionForm)}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: 8,
+                    border: `1px solid ${C.border}`,
+                    background: "transparent",
+                    color: C.textSoft,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {showNutritionForm ? "Cancel" : "+ Add Meal"}
+                </button>
+              </div>
+              {showNutritionForm && <NutritionForm onSuccess={() => { setShowNutritionForm(false); d.refetchAll(); }} />}
+              {d.nutritionMeals.length > 0 && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}15` }}>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>Meals Logged</div>
+                  {d.nutritionMeals.map(m => (
+                    <div key={m.id} style={{ fontSize: 11, color: C.textSoft, padding: "6px 0", borderBottom: `1px solid ${C.border}15` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>{m.time_logged} · {m.meal_type}</span>
+                        <span style={{ color: C.textMuted }}>{Math.round(m.calories || 0)} kcal</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: C.textDim }}>{m.description}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* Body Metrics */}
+            {d.latestBody && (
+              <Panel title="Body Metrics" icon={TrendUp} color={C.cyan} action={<span style={{ fontSize: 11, color: C.textDim }}>Latest</span>}>
+                <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 6 }}>{Number(d.latestBody.weight_lbs).toFixed(1)} <span style={{ fontSize: 14, fontWeight: 400, color: C.textMuted }}>lbs</span></div>
+                {d.latestBody.body_fat_percentage && <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>BF: {Number(d.latestBody.body_fat_percentage).toFixed(1)}%</div>}
+                {d.latestBody.resting_heart_rate && <div style={{ fontSize: 13, color: C.red, marginBottom: 12 }}>RHR: {d.latestBody.resting_heart_rate} bpm</div>}
+                <button
+                  onClick={() => setShowBodyMetricsForm(!showBodyMetricsForm)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: 8,
+                    border: `1px solid ${C.border}`,
+                    background: "transparent",
+                    color: C.textSoft,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {showBodyMetricsForm ? "Cancel" : "+ Log Metrics"}
+                </button>
+                {showBodyMetricsForm && <BodyMetricsForm onSuccess={() => { setShowBodyMetricsForm(false); d.refetchAll(); }} />}
+              </Panel>
+            )}
+
+            {/* Training Status */}
+            <Panel title="Genesis Training" icon={Dumbbell} color={C.green} action={<span style={{ fontSize: 11, color: C.cyan }}>{d.genesisCountdown}d to race</span>}>
+              <div style={{ marginBottom: 14 }}>
+                <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={7} label="Progress" />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span style={{ fontSize: 10, color: C.textDim }}>{d.completedDays} of {d.totalDays} days</span>
+                  <span style={{ fontSize: 10, color: C.cyan }}>May 3, 2026</span>
+                </div>
+              </div>
+              {d.training.slice(0, 3).map(t => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: C.text }}>{t.workout_name}</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus}</div>
+                  </div>
+                  {t.completed && <CheckCirc size={15} color={C.green} />}
+                </div>
+              ))}
+            </Panel>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <button onClick={d.refetchAll} title="Refresh" style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, padding: 8, cursor: "pointer", display: "flex" }}>
-              <Refresh size={16} color={C.textDim} />
-            </button>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: 1 }}>GENESIS RACE</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, lineHeight: 1.1 }}>{d.genesisCountdown} <span style={{ fontSize: 12, fontWeight: 400, color: C.textDim }}>days</span></div>
-            </div>
-            <CadenceAvatar status={agentStatus} size={56} />
+        )}
+
+        {/* TRAINING TAB */}
+        {activeTab === "training" && (
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            <Panel title="Genesis Training Log" icon={Dumbbell} color={C.green}>
+              <div style={{ marginBottom: 18 }}>
+                <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={8} label="Overall Progress" />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: C.textDim }}>{d.completedDays} of {d.totalDays} completed</span>
+                  <span style={{ fontSize: 11, color: C.cyan, fontWeight: 600 }}>{d.genesisCountdown} days to race</span>
+                </div>
+              </div>
+              {d.training.map(t => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: C.text }}>{t.workout_name}</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus} · {t.phase} Wk{t.week}</div>
+                    {t.notes && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, fontStyle: "italic" }}>{t.notes.length > 80 ? t.notes.slice(0, 80) + "…" : t.notes}</div>}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                  {t.completed && <CheckCirc size={15} color={C.green} />}
+                </div>
+              ))}
+            </Panel>
           </div>
-        </header>
+        )}
 
-        {/* ══════════ OVERVIEW ══════════ */}
-        {activeTab === "overview" && (
-          <div className="fade-in">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22 }}>
-              <StatCard icon={Target} label="Open Tasks" value={openTasks} color={C.accent} sub={critTasks ? `${critTasks} critical` : "All clear"} />
-              <StatCard icon={Brain} label="Memories" value={d.memories.length} color={C.purple} sub={`${d.memories.filter(m => m.memory_type === "core_memory").length} core`} />
-              <StatCard icon={Dumbbell} label="Training Day" value={`D${d.currentDay}`} color={C.green} sub={`${d.totalDays > 0 ? Math.round((d.completedDays / d.totalDays) * 100) : 0}% complete`} />
-              <StatCard icon={Dollar} label="Today's Spend" value={`$${d.todayCost.toFixed(2)}`} color={C.cyan} sub="$10/day budget" />
-            </div>
+        {/* CHAT TAB */}
+        {activeTab === "chat" && (
+          <ChatWindow status={agentStatus} onDataChanged={d.refetchAll} />
+        )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
-              {/* Tasks */}
-              <Panel title="Tasks" icon={Target} color={C.accent} action={<span style={{ fontSize: 11, color: C.textDim }}>{openTasks} open</span>}>
-                {d.tasks.filter(t => t.status !== "completed").slice(0, 6).map(t => {
+        {/* CONN TAB */}
+        {activeTab === "conn" && (
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            {/* Tasks */}
+            <Panel title="Heartbeat Queue" icon={Target} color={C.accent} action={<span style={{ fontSize: 11, color: C.textDim }}>{openTasks} open</span>}>
+              {d.tasks.filter(t => t.status !== "completed").length > 0 ? (
+                d.tasks.filter(t => t.status !== "completed").map(t => {
                   const SI = StatusIcon(t.status);
                   return (
                     <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
@@ -803,279 +1076,118 @@ export default function CadenceCommandCenter() {
                       <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: `${prioColor(t.priority)}15`, color: prioColor(t.priority), textTransform: "uppercase", fontWeight: 600 }}>{prioLabel(t.priority)}</span>
                     </div>
                   );
-                })}
-                {d.tasks.length === 0 && <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No tasks in heartbeat queue</div>}
-              </Panel>
+                })
+              ) : (
+                <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No active tasks</div>
+              )}
+            </Panel>
 
-              {/* Memory */}
-              <Panel title="Memory Bank" icon={Brain} color={C.purple} action={<span style={{ fontSize: 11, color: C.textDim }}>{d.memories.length} entries</span>}>
-                {d.memories.slice(0, 5).map(m => (
+            {/* Memory Bank */}
+            <Panel title="Memory Bank" icon={Brain} color={C.purple} action={<span style={{ fontSize: 11, color: C.textDim }}>{d.memories.length} entries</span>}>
+              {d.memories.length > 0 ? (
+                d.memories.map(m => (
                   <div key={m.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{m.key.replace(/_/g, " ")}</span>
-                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${memTypeColor(m.memory_type)}15`, color: memTypeColor(m.memory_type), fontWeight: 600 }}>{m.memory_type.replace(/_/g, " ")}</span>
+                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${C.purple}15`, color: C.purple, fontWeight: 600 }}>{m.category.replace(/_/g, " ")}</span>
                     </div>
                     <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.55 }}>{m.content.length > 150 ? m.content.slice(0, 150) + "…" : m.content}</div>
                   </div>
-                ))}
-              </Panel>
-
-              {/* Training */}
-              <Panel title="Genesis Training" icon={Dumbbell} color={C.green} action={<span style={{ fontSize: 11, color: C.cyan }}>{d.genesisCountdown}d to race</span>}>
-                <div style={{ marginBottom: 14 }}>
-                  <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={7} label={d.training[0] ? `${d.training[0].phase} · Week ${d.training[0].week}` : "Loading…"} />
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                    <span style={{ fontSize: 10, color: C.textDim }}>{d.completedDays} of {d.totalDays} days</span>
-                    <span style={{ fontSize: 10, color: C.cyan }}>May 3, 2026</span>
-                  </div>
-                </div>
-                {d.training.slice(0, 5).map(t => (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: C.text }}>{t.workout_name}</div>
-                      <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus} · {t.phase}</div>
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
-                    {t.completed && <CheckCirc size={15} color={C.green} />}
-                  </div>
-                ))}
-              </Panel>
-
-              {/* Nutrition + Body */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                <Panel title="Nutrition Today" icon={Utensils} color={C.gold} action={<span style={{ fontSize: 11, color: C.textDim }}>Keto</span>}>
-                  <MacroBar label="Protein" value={d.nutritionTotals.protein} target={180} color={C.accent} />
-                  <MacroBar label="Fat" value={d.nutritionTotals.fat} target={140} color={C.gold} />
-                  <MacroBar label="Net Carbs" value={d.nutritionTotals.netCarbs} target={30} color={C.green} />
-                  <MacroBar label="Calories" value={d.nutritionTotals.calories} target={2200} unit="kcal" color={C.cyan} />
-                  {d.nutritionMeals.length === 0 && <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>No meals logged today</div>}
-                </Panel>
-
-                {d.latestBody && (
-                  <Panel title="Body Metrics" icon={TrendUp} color={C.cyan}>
-                    <div style={{ fontSize: 36, fontWeight: 700, marginBottom: 2 }}>{Number(d.latestBody.weight_lbs).toFixed(1)} <span style={{ fontSize: 14, fontWeight: 400, color: C.textMuted }}>lbs</span></div>
-                    {d.latestBody.body_fat_percentage && <div style={{ fontSize: 12, color: C.gold }}>BF: {Number(d.latestBody.body_fat_percentage).toFixed(1)}%</div>}
-                    {d.latestBody.resting_heart_rate && <div style={{ fontSize: 12, color: C.red, marginTop: 4 }}>RHR: {d.latestBody.resting_heart_rate} bpm</div>}
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 8 }}>Last: {new Date(d.latestBody.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
-                  </Panel>
-                )}
-              </div>
-            </div>
-
-            {/* Soul strip */}
-            <div style={{ padding: "16px 20px", background: C.surfaceAlt, borderRadius: 14, border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 10, display: "flex", alignItems: "center", gap: 6, letterSpacing: 1 }}>
-                <Shield size={12} color={C.gold} /> SOUL DIRECTIVES
-              </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {d.soul.slice(0, 6).map(s => (
-                  <div key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, padding: "7px 14px", borderRadius: 20, background: `${C.cyan}08`, border: `1px solid ${C.cyan}18`, color: C.textSoft }}>
-                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.cyan }} />
-                    {s.directive}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════ TASKS ══════════ */}
-        {activeTab === "tasks" && (
-          <div className="fade-in">
-            <Panel title="All Tasks" icon={Target} color={C.accent}>
-              {d.tasks.map(t => {
-                const SI = StatusIcon(t.status);
-                return (
-                  <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
-                    <SI size={16} color={statusColor(t.status)} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: C.text, fontWeight: t.status === "in_progress" ? 600 : 400, textDecoration: t.status === "completed" ? "line-through" : "none", opacity: t.status === "completed" ? 0.6 : 1 }}>{t.task}</div>
-                      {t.description && <div style={{ fontSize: 11, color: C.textDim, marginTop: 3 }}>{t.description}</div>}
-                    </div>
-                    <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: `${prioColor(t.priority)}15`, color: prioColor(t.priority), textTransform: "uppercase", fontWeight: 600 }}>{prioLabel(t.priority)}</span>
-                    <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: `${C.accent}10`, color: C.accent }}>{t.category}</span>
-                  </div>
-                );
-              })}
-              {d.tasks.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textDim }}>Heartbeat queue empty</div>}
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No memories yet</div>
+              )}
             </Panel>
-          </div>
-        )}
 
-        {/* ══════════ MEMORY ══════════ */}
-        {activeTab === "memory" && (
-          <div className="fade-in">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
-              {["core_memory", "decision", "skill", "preference", "knowledge"].map(type => {
-                const ct = d.memories.filter(m => m.memory_type === type).length;
-                if (ct === 0) return null;
-                return (
-                  <div key={type} style={{ padding: "14px 16px", borderRadius: 12, background: C.surface, border: `1px solid ${C.border}` }}>
-                    <div style={{ fontSize: 10, color: memTypeColor(type), textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{type.replace(/_/g, " ")}</div>
-                    <div style={{ fontSize: 22, fontWeight: 700 }}>{ct}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <Panel title="Memory Bank" icon={Brain} color={C.purple}>
-              {d.memories.map(m => (
-                <div key={m.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{m.key.replace(/_/g, " ")}</span>
-                    <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${memTypeColor(m.memory_type)}15`, color: memTypeColor(m.memory_type), fontWeight: 600 }}>{m.memory_type.replace(/_/g, " ")}</span>
-                    <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
-                      {[...Array(5)].map((_, i) => <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: i < m.importance ? C.gold : C.border }} />)}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.55 }}>{m.content}</div>
-                  {m.tags.length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>{m.tags.map(tag => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${C.accent}10`, color: C.textDim }}>{tag}</span>)}</div>}
-                </div>
-              ))}
-            </Panel>
-          </div>
-        )}
-
-        {/* ══════════ TRAINING ══════════ */}
-        {activeTab === "training" && (
-          <div className="fade-in">
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
-              <Panel title="Genesis Training Log" icon={Dumbbell} color={C.green}>
-                <div style={{ marginBottom: 18 }}>
-                  <ProgressBar value={d.completedDays} max={d.totalDays || 98} color={C.green} height={8} label="Overall Progress" />
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-                    <span style={{ fontSize: 11, color: C.textDim }}>{d.completedDays} of {d.totalDays} completed</span>
-                    <span style={{ fontSize: 11, color: C.cyan, fontWeight: 600 }}>{d.genesisCountdown} days to race</span>
-                  </div>
-                </div>
-                {d.training.map(t => (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}15` }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: t.completed ? `${C.green}15` : `${C.textDim}10`, color: t.completed ? C.green : C.textDim, border: `1px solid ${t.completed ? C.green + "30" : C.border}` }}>D{t.day_number}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: C.text }}>{t.workout_name}</div>
-                      <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{t.focus} · {t.phase} Wk{t.week}</div>
-                      {t.notes && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, fontStyle: "italic" }}>{t.notes.length > 80 ? t.notes.slice(0, 80) + "…" : t.notes}</div>}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textMuted }}>{new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
-                    {t.completed && <CheckCirc size={15} color={C.green} />}
-                  </div>
-                ))}
-              </Panel>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                {d.latestBody && (
-                  <Panel title="Body Metrics" icon={TrendUp} color={C.cyan}>
-                    <div style={{ fontSize: 36, fontWeight: 700, marginBottom: 2 }}>{Number(d.latestBody.weight_lbs).toFixed(1)} <span style={{ fontSize: 14, fontWeight: 400, color: C.textMuted }}>lbs</span></div>
-                    {d.bodyMetrics.length >= 2 && (() => {
-                      const diff = Number(d.bodyMetrics[0].weight_lbs) - Number(d.bodyMetrics[d.bodyMetrics.length - 1].weight_lbs);
-                      return <div style={{ fontSize: 12, color: diff < 0 ? C.green : C.red }}>{diff < 0 ? "▼" : "▲"} {Math.abs(diff).toFixed(1)} lbs (7d)</div>;
-                    })()}
-                    {d.latestBody.body_fat_percentage && <MacroBar label="Body Fat %" value={Number(d.latestBody.body_fat_percentage)} target={100} unit="%" color={C.gold} />}
-                  </Panel>
-                )}
-
-                <Panel title="Nutrition Today" icon={Utensils} color={C.gold}>
-                  <MacroBar label="Protein" value={d.nutritionTotals.protein} target={180} color={C.accent} />
-                  <MacroBar label="Fat" value={d.nutritionTotals.fat} target={140} color={C.gold} />
-                  <MacroBar label="Net Carbs" value={d.nutritionTotals.netCarbs} target={30} color={C.green} />
-                  <MacroBar label="Calories" value={d.nutritionTotals.calories} target={2200} unit="kcal" color={C.cyan} />
-                </Panel>
-
-                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <CadenceAvatar status={agentStatus} size={120} />
-                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 12, letterSpacing: 1 }}>CADENCE · ACTIVE</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════ COST ══════════ */}
-        {activeTab === "cost" && (
-          <div className="fade-in">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-              <StatCard icon={Dollar} label="Today" value={`$${d.todayCost.toFixed(2)}`} color={C.green} sub="$10/day budget" />
-              <StatCard icon={Dollar} label="Total Logged" value={`$${d.costLog.reduce((s, c) => s + (Number(c.cost_usd) || 0), 0).toFixed(2)}`} color={C.accent} sub={`${d.costLog.length} sessions`} />
-              <StatCard icon={CpuIc} label="Total Tokens" value={`${((d.costLog.reduce((s, c) => s + (c.tokens_input || 0) + (c.tokens_output || 0), 0)) / 1000).toFixed(1)}K`} color={C.cyan} />
-            </div>
-            <Panel title="Cost Log" icon={Dollar} color={C.cyan}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "0 0 10px", borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
-                <div style={{ width: 6 }} />
-                <span style={{ fontSize: 10, color: C.textDim, flex: 1 }}>TASK</span>
-                <span style={{ fontSize: 10, color: C.textDim, width: 140 }}>MODEL</span>
-                <span style={{ fontSize: 10, color: C.textDim, width: 60, textAlign: "right" }}>TOKENS</span>
-                <span style={{ fontSize: 10, color: C.textDim, width: 60, textAlign: "right" }}>COST</span>
-              </div>
-              {d.costLog.map(e => {
-                const mc = e.model_used?.includes("sonnet") ? C.accent : e.model_used?.includes("haiku") ? C.green : e.model_used?.includes("gemini") ? C.gold : C.textMuted;
-                const tokens = ((e.tokens_input || 0) + (e.tokens_output || 0));
-                return (
-                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 0", borderBottom: `1px solid ${C.border}15` }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: mc, boxShadow: `0 0 6px ${mc}50`, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: C.text, flex: 1 }}>{e.task_type || "session"}</span>
-                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${mc}12`, color: mc, fontWeight: 500, width: 140, textAlign: "center" }}>{e.model_used || "unknown"}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, width: 60, textAlign: "right" }}>{tokens > 0 ? `${(tokens / 1000).toFixed(1)}K` : "—"}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.green, width: 60, textAlign: "right" }}>${Number(e.cost_usd || 0).toFixed(3)}</span>
-                  </div>
-                );
-              })}
-              {d.costLog.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textDim }}>No cost data logged yet</div>}
-            </Panel>
-          </div>
-        )}
-
-        {/* ══════════ SOUL ══════════ */}
-        {activeTab === "soul" && (
-          <div className="fade-in">
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, padding: "30px 0" }}>
-              <div style={{ textAlign: "center" }}>
-                <CadenceAvatar status={agentStatus} size={180} />
-                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 16, letterSpacing: 2 }}>CADENCE</div>
-                <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>Rhythm, pace, precision — the tempo of peak performance</div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <Panel title="Soul Directives" icon={Shield} color={C.gold}>
-                {d.soul.map(s => (
-                  <div key={s.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}15` }}>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, padding: "7px 14px", borderRadius: 20, background: `${C.cyan}08`, border: `1px solid ${C.cyan}18`, color: C.textSoft }}>
+            {/* Soul Directives */}
+            <Panel title="Soul Directives" icon={Shield} color={C.gold}>
+              {d.soul.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {d.soul.map(s => (
+                    <div key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, padding: "7px 14px", borderRadius: 20, background: `${C.cyan}08`, border: `1px solid ${C.cyan}18`, color: C.textSoft }}>
                       <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.cyan }} />
                       {s.directive}
                     </div>
-                    <span style={{ fontSize: 9, marginLeft: 8, color: C.textDim }}>{s.category}</span>
-                  </div>
-                ))}
-              </Panel>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No soul directives</div>
+              )}
+            </Panel>
 
-              <Panel title="Identity" icon={Zap} color={C.green}>
-                {d.identity.slice(0, 15).map(item => (
+            {/* Identity */}
+            <Panel title="Cadence Identity" icon={Zap} color={C.green}>
+              {d.cadenceIdentity.length > 0 ? (
+                d.cadenceIdentity.slice(0, 10).map(item => (
                   <div key={item.id} style={{ display: "flex", padding: "9px 0", borderBottom: `1px solid ${C.border}15` }}>
                     <span style={{ fontSize: 11, color: C.textDim, width: 120, flexShrink: 0 }}>{item.key.replace(/_/g, " ")}</span>
                     <span style={{ fontSize: 12, color: C.textSoft }}>{item.value.length > 100 ? item.value.slice(0, 100) + "…" : item.value}</span>
                   </div>
-                ))}
-              </Panel>
-            </div>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: C.textDim, padding: 20, textAlign: "center" }}>No identity data</div>
+              )}
+            </Panel>
           </div>
         )}
-
-        {/* ══════════ CHAT ══════════ */}
-        {activeTab === "chat" && (
-          <div className="fade-in">
-            <ChatWindow status={agentStatus} onDataChanged={d.refetchAll} />
-          </div>
-        )}
-
-        {/* Footer */}
-        <footer style={{ marginTop: 28, padding: "14px 0", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
-            <span style={{ fontSize: 11, color: C.textMuted }}>connected · bghyjxxjtkzvmfkbibqp</span>
-          </div>
-          <span style={{ fontSize: 11, color: C.textDim }}>{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · Cadence v0.3.0</span>
-        </footer>
       </main>
+
+      {/* BOTTOM TAB NAVIGATION */}
+      <nav style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 56,
+        background: C.surface,
+        borderTop: `1px solid ${C.border}`,
+        display: "flex",
+        justifyContent: "space-around",
+        alignItems: "center",
+        zIndex: 100,
+      }}>
+        {navItems.map(item => {
+          const active = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              style={{
+                flex: 1,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                background: active ? `${C.accent}06` : "transparent",
+                border: "none",
+                cursor: "pointer",
+                borderTop: active ? `2px solid ${C.cyan}` : "none",
+                transition: "all 0.2s",
+              }}
+            >
+              <item.icon size={20} color={active ? C.cyan : C.textDim} />
+              <span style={{ fontSize: 9, color: active ? C.cyan : C.textDim, fontWeight: active ? 600 : 400 }}>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Global animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
+        .fade-in {
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

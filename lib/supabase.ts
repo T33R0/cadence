@@ -12,22 +12,24 @@ export const supabase = createClient(
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   TYPE DEFINITIONS — mapped from Ogma's live Supabase schema
+   TYPE DEFINITIONS — mapped from Conn/Cadence live Supabase schema
+   Project: bghyjxxjtkzvmfkbibqp
    ═══════════════════════════════════════════════════════════════ */
 
-export type PulseMemory = {
+// Conn agent tables (conn_* prefix)
+export type ConnMemory = {
   id: string;
   key: string;
   content: string;
+  category: string;
   tags: string[];
-  memory_type: string; // core_memory | decision | skill | preference | knowledge
   importance: number;
   source_session: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type PulseSoul = {
+export type ConnSoul = {
   id: string;
   directive: string;
   category: string;
@@ -37,7 +39,7 @@ export type PulseSoul = {
   updated_at: string;
 };
 
-export type PulseIdentity = {
+export type ConnIdentity = {
   id: string;
   key: string;
   value: string;
@@ -46,7 +48,7 @@ export type PulseIdentity = {
   updated_at: string;
 };
 
-export type PulseHeartbeat = {
+export type ConnHeartbeat = {
   id: string;
   task: string;
   description: string | null;
@@ -55,27 +57,18 @@ export type PulseHeartbeat = {
   status: string; // pending | in_progress | completed | failed
   scheduled_for: string | null;
   recurrence: string | null;
+  max_retries: number;
+  retry_count: number;
   result: string | null;
   error: string | null;
   completed_at: string | null;
+  created_by_session: string | null;
+  telegram_update_id: number | null;
   created_at: string;
   updated_at: string;
 };
 
-export type PulseCostLog = {
-  id: string;
-  session_date: string;
-  model_used: string;
-  tokens_input: number | null;
-  tokens_output: number | null;
-  cost_usd: number | null;
-  task_type: string | null;
-  value_generated: string | null;
-  notes: string | null;
-  created_at: string;
-};
-
-export type PulseSessionLog = {
+export type ConnSessionLog = {
   id: string;
   log_date: string;
   session_id: string | null;
@@ -83,14 +76,21 @@ export type PulseSessionLog = {
   topics: string[];
   decisions_made: string[];
   tasks_created: string[];
-  tokens_estimated: number | null;
-  tokens_input: number | null;
-  tokens_output: number | null;
   model_used: string | null;
-  cost_usd: number | null;
   created_at: string;
 };
 
+// Cadence identity (dashboard personality)
+export type CadenceIdentity = {
+  id: string;
+  key: string;
+  value: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Training & wellness tables
 export type TrainingLog = {
   id: string;
   day_number: number;
@@ -108,6 +108,7 @@ export type TrainingLog = {
   instagram_posted: boolean;
   synced_at: string | null;
   created_at: string;
+  updated_at: string | null;
 };
 
 export type NutritionMeal = {
@@ -116,6 +117,8 @@ export type NutritionMeal = {
   time_logged: string | null;
   meal_type: string | null;
   description: string | null;
+  source: string | null;
+  is_wife_plan: boolean;
   calories: number | null;
   protein_g: number | null;
   carbs_g: number | null;
@@ -124,6 +127,7 @@ export type NutritionMeal = {
   fiber_g: number | null;
   notes: string | null;
   created_at: string;
+  updated_at: string | null;
 };
 
 export type BodyMetric = {
@@ -133,6 +137,21 @@ export type BodyMetric = {
   weight_lbs: number | null;
   body_fat_percentage: number | null;
   resting_heart_rate: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type WifeMealPlan = {
+  id: number;
+  week_start_date: string;
+  meal_day: string | null;
+  meal_type: string | null;
+  description: string | null;
+  planned_protein_g: number | null;
+  planned_carbs_g: number | null;
+  planned_net_carbs_g: number | null;
+  planned_fat_g: number | null;
+  planned_calories: number | null;
   notes: string | null;
   created_at: string;
 };
@@ -150,3 +169,14 @@ export type ChatMessage = {
 
 // Edge Function URL for chat
 export const CHAT_FUNCTION_URL = `${supabaseUrl}/functions/v1/chat`;
+
+// Model pricing (per 1M tokens: input/output)
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  "haiku-4.5":   { input: 1.00, output: 5.00 },
+  "sonnet-4":    { input: 3.00, output: 15.00 },
+  "sonnet-4.5":  { input: 3.00, output: 15.00 },
+  "opus-4.6":    { input: 15.00, output: 75.00 },
+  // Fallback names from DB
+  "claude-3-haiku":  { input: 0.25, output: 1.25 },
+  "claude-3-sonnet": { input: 3.00, output: 15.00 },
+};

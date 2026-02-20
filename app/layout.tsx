@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ogma CC",
-  description: "Ogma Command Center — Personal AI Operations Dashboard",
+  title: "Cadence",
+  description: "Cadence — Personal Performance Dashboard",
   icons: { icon: "/favicon.ico" },
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 export default function RootLayout({
