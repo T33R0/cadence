@@ -326,10 +326,27 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
    ═══════════════════════════════════════════════════════════════ */
 type ChatMsg = { id: string; role: "user" | "assistant"; content: string; created_at: string };
 
+const MODEL_OPTIONS = [
+  { key: "haiku-4.5", label: "Haiku 4.5", cost: "$1/$5" },
+  { key: "sonnet-4", label: "Sonnet 4", cost: "$3/$15" },
+  { key: "sonnet-4.5", label: "Sonnet 4.5", cost: "$3/$15" },
+  { key: "opus-4.6", label: "Opus 4.6", cost: "$15/$75" },
+];
+
 function useChat(onDataChanged?: () => void) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [model, setModelState] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("cadence_chat_model") || "haiku-4.5";
+    }
+    return "haiku-4.5";
+  });
+  const setModel = useCallback((m: string) => {
+    setModelState(m);
+    if (typeof window !== "undefined") sessionStorage.setItem("cadence_chat_model", m);
+  }, []);
   const [sessionId] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = sessionStorage.getItem("cadence_chat_session");
@@ -388,7 +405,7 @@ function useChat(onDataChanged?: () => void) {
           "apikey": SUPABASE_ANON_KEY,
           "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ message: text.trim(), session_id: sessionId }),
+        body: JSON.stringify({ message: text.trim(), session_id: sessionId, model }),
       });
       const data = await res.json();
       if (data.reply) {
@@ -398,7 +415,7 @@ function useChat(onDataChanged?: () => void) {
           content: data.reply,
           created_at: new Date().toISOString(),
         }]);
-        // Auto-refresh dashboard data when Ogma used tools (created tasks, saved memories, etc.)
+        // Auto-refresh dashboard data when Cadence used tools (created tasks, saved memories, etc.)
         if (data.tool_calls > 0 && onDataChanged) {
           setTimeout(() => onDataChanged(), 500);
         }
@@ -420,7 +437,7 @@ function useChat(onDataChanged?: () => void) {
     } finally {
       setSending(false);
     }
-  }, [sending, sessionId, onDataChanged]);
+  }, [sending, sessionId, onDataChanged, model]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
@@ -428,11 +445,11 @@ function useChat(onDataChanged?: () => void) {
     sessionStorage.setItem("cadence_chat_session", id);
   }, []);
 
-  return { messages, sending, send, clearChat, sessionId, loadingHistory };
+  return { messages, sending, send, clearChat, sessionId, loadingHistory, model, setModel };
 }
 
 function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?: () => void }) {
-  const { messages, sending, send, clearChat, loadingHistory } = useChat(onDataChanged);
+  const { messages, sending, send, clearChat, loadingHistory, model, setModel } = useChat(onDataChanged);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -462,9 +479,28 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
             </div>
           </div>
         </div>
-        <button onClick={clearChat} style={{ fontSize: 10, color: C.textDim, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
-          New Chat
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <select
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            disabled={sending}
+            style={{
+              fontSize: 10, color: C.textSoft, background: C.surfaceHi, border: `1px solid ${C.border}`,
+              borderRadius: 6, padding: "4px 8px", cursor: "pointer", outline: "none",
+              appearance: "none", WebkitAppearance: "none",
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center",
+              paddingRight: 20,
+            }}
+          >
+            {MODEL_OPTIONS.map(m => (
+              <option key={m.key} value={m.key}>{m.label} ({m.cost})</option>
+            ))}
+          </select>
+          <button onClick={clearChat} style={{ fontSize: 10, color: C.textDim, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+            New Chat
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
