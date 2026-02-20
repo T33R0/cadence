@@ -44,15 +44,32 @@ const Refresh = Ic(<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 
 const MsgCircle = Ic(<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>);
 
 /* ═══════════════════════════════════════════════════════════════
-   CADENCE AVATAR — Canvas-based crystalline intelligence
+   CADENCE AVATAR — The Living Pulse Ring
+   A toroidal ring with traveling sine wave displacement.
+   Precision biometrics aesthetic. No face, no anthropomorphism.
    ═══════════════════════════════════════════════════════════════ */
+const CAD = {
+  base: "#00E5CC",       // cyan-teal
+  violet: "#7B61FF",     // thinking/processing
+  green: "#00FF88",      // success
+  red: "#FF3D5A",        // error/alert
+  orange: "#FF8800",     // deep work / zone
+  bg: "#0A0A0F",         // near-black
+};
+
 function CadenceAvatar({ status = "online", size = 200 }: { status?: string; size?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
-  const timeRef = useRef<number>(0);
-  const stateRef = useRef({ status });
+  const stateRef = useRef({ status, transitionStart: 0, prevStatus: status });
+  const startTimeRef = useRef<number>(0);
 
-  useEffect(() => { stateRef.current.status = status; }, [status]);
+  useEffect(() => {
+    if (stateRef.current.status !== status) {
+      stateRef.current.prevStatus = stateRef.current.status;
+      stateRef.current.transitionStart = performance.now();
+      stateRef.current.status = status;
+    }
+  }, [status]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -65,197 +82,279 @@ function CadenceAvatar({ status = "online", size = 200 }: { status?: string; siz
     canvas.style.height = size + "px";
     ctx.scale(dpr, dpr);
     const cx = size / 2, cy = size / 2;
+    const ringR = size * 0.30;       // torus major radius (60% of canvas → radius = 30%)
+    const tubeR = size * 0.055;      // torus tube radius
+    const TILT_X = 0.26;             // ~15° tilt on X axis
+    const SEGMENTS = 180;            // ring resolution
 
-    // Core vertices — asymmetric crystalline
-    const coreVerts: { angle: number; baseR: number; phase: number }[] = [];
-    for (let i = 0; i < 9; i++) {
-      const angle = (i / 9) * Math.PI * 2 - Math.PI / 2;
-      const rm = i < 5 ? 1.0 + Math.sin(i * 0.7) * 0.25 : 0.7 + Math.cos(i * 1.1) * 0.2;
-      coreVerts.push({ angle, baseR: size * 0.12 * rm, phase: Math.random() * Math.PI * 2 });
-    }
-
-    // Light paths
-    const paths: any[] = [];
-    for (let i = 0; i < 18; i++) {
-      paths.push({
-        angle: (i / 18) * Math.PI * 2 + (Math.random() - 0.5) * 0.4,
-        length: 0.3 + Math.random() * 0.55,
-        isComplete: Math.random() > 0.35,
-        loopsBack: Math.random() > 0.7,
-        isGold: Math.random() > 0.75,
-        speed: 0.3 + Math.random() * 0.7,
-        width: 0.5 + Math.random() * 1.5,
-        curvature: (Math.random() - 0.5) * 0.6,
-        phase: Math.random() * Math.PI * 2,
-      });
-    }
-
-    // Particles
-    const particles: any[] = [];
-    for (let i = 0; i < 30; i++) {
+    // Particles — sparse data points
+    const particles: { angle: number; vAngle: number; dist: number; sz: number; opacity: number }[] = [];
+    for (let i = 0; i < 8; i++) {
       particles.push({
         angle: Math.random() * Math.PI * 2,
-        dist: size * 0.15 + Math.random() * size * 0.3,
-        speed: 0.002 + Math.random() * 0.008,
-        sz: 0.5 + Math.random() * 2,
-        isGold: Math.random() > 0.8,
-        opacity: 0.2 + Math.random() * 0.5,
-        drift: (Math.random() - 0.5) * 0.02,
+        vAngle: (0.001 + Math.random() * 0.003) * (Math.random() > 0.5 ? 1 : -1),
+        dist: ringR * 0.3 + Math.random() * ringR * 0.4,
+        sz: 1 + Math.random() * 2,
+        opacity: 0.3 + Math.random() * 0.4,
       });
     }
 
-    function getParams(t: number) {
-      const s = stateRef.current.status;
-      if (s === "thinking") return { pulseSpeed: 3, brightness: 1.4, chaos: 0, breathe: 0.02, pathSpeed: 2.5 };
-      if (s === "success") return { pulseSpeed: 0.8, brightness: 1.6, chaos: 0, breathe: 0.01, pathSpeed: 0.5 };
-      if (s === "error") {
-        const d = Math.min(1, t * 0.0003);
-        return { pulseSpeed: 5 - d * 3, brightness: 1.2, chaos: 0.8 - d * 0.6, breathe: 0.05 - d * 0.03, pathSpeed: 4 - d * 2 };
-      }
-      if (s === "idle") return { pulseSpeed: 0.3, brightness: 0.3, chaos: 0, breathe: 0.008, pathSpeed: 0.2 };
-      return { pulseSpeed: 1, brightness: 1, chaos: 0, breathe: 0.015, pathSpeed: 1 };
+    // Success ping state
+    let successPingT = -1;
+
+    function getStateParams(s: string) {
+      // Returns: rotSpeed (rad/s), pulseFreq (Hz), pulseAmp (0-1), color rgb, glowIntensity, harmonic2
+      if (s === "thinking") return {
+        rotSpeed: Math.PI * 2 / 4,  // 4s rotation (2x normal)
+        pulseFreq: 2.5,             // 2-3 per second
+        pulseAmp: 0.7,
+        color: [123, 97, 255] as number[],   // violet
+        glowIntensity: 1.4,
+        harmonic2: 0.35,            // second harmonic overlay
+        particleCount: 18,
+        particleOrbit: true,
+      };
+      if (s === "success") return {
+        rotSpeed: Math.PI * 2 / 8,
+        pulseFreq: 1.0,
+        pulseAmp: 0.4,
+        color: [0, 229, 204] as number[],
+        glowIntensity: 1.6,
+        harmonic2: 0,
+        particleCount: 8,
+        particleOrbit: false,
+      };
+      if (s === "error") return {
+        rotSpeed: Math.PI * 2 / 8,
+        pulseFreq: 4.0,             // fast sharp pulse
+        pulseAmp: 1.0,
+        color: [255, 61, 90] as number[],    // arterial red
+        glowIntensity: 1.2,
+        harmonic2: 0,
+        particleCount: 5,
+        particleOrbit: false,
+      };
+      if (s === "idle") return {
+        rotSpeed: Math.PI * 2 / 8,  // 8s rotation
+        pulseFreq: 1.0,             // resting heartbeat — once per second
+        pulseAmp: 0.25,
+        color: [0, 229 * 0.7, 204 * 0.7] as number[],  // teal at 70%
+        glowIntensity: 0.5,
+        harmonic2: 0,
+        particleCount: 6,
+        particleOrbit: false,
+      };
+      // "online" default
+      return {
+        rotSpeed: Math.PI * 2 / 8,
+        pulseFreq: 1.0,
+        pulseAmp: 0.35,
+        color: [0, 229, 204] as number[],
+        glowIntensity: 1.0,
+        harmonic2: 0,
+        particleCount: 8,
+        particleOrbit: false,
+      };
     }
+
+    function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+    function lerpColor(a: number[], b: number[], t: number) { return a.map((v, i) => lerp(v, b[i], t)); }
 
     function draw(ts: number) {
-      timeRef.current = ts;
-      const t = ts;
-      const p = getParams(t);
+      if (!startTimeRef.current) startTimeRef.current = ts;
+      const elapsed = (ts - startTimeRef.current) / 1000; // seconds
+      const s = stateRef.current.status;
+      const transT = Math.min(1, (ts - stateRef.current.transitionStart) / 400); // 400ms transition
+      const easeT = transT < 1 ? transT * transT * (3 - 2 * transT) : 1; // smoothstep
+
+      const cur = getStateParams(s);
+      const prev = getStateParams(stateRef.current.prevStatus);
+      const rotSpeed = lerp(prev.rotSpeed, cur.rotSpeed, easeT);
+      const pulseFreq = lerp(prev.pulseFreq, cur.pulseFreq, easeT);
+      const pulseAmp = lerp(prev.pulseAmp, cur.pulseAmp, easeT);
+      const color = lerpColor(prev.color, cur.color, easeT);
+      const glowI = lerp(prev.glowIntensity, cur.glowIntensity, easeT);
+      const harm2 = lerp(prev.harmonic2, cur.harmonic2, easeT);
+
+      // Success ping trigger
+      if (s === "success" && stateRef.current.prevStatus !== "success" && transT < 0.1) {
+        successPingT = elapsed;
+      }
+
       ctx.clearRect(0, 0, size, size);
 
-      // Background glow
-      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-      bg.addColorStop(0, `rgba(59,7,100,${0.15 * p.brightness})`);
-      bg.addColorStop(0.5, `rgba(30,4,60,${0.08 * p.brightness})`);
-      bg.addColorStop(1, "transparent");
-      ctx.fillStyle = bg;
+      // Background — near-black
+      ctx.fillStyle = CAD.bg;
       ctx.fillRect(0, 0, size, size);
 
-      const breathe = 1 + Math.sin(t * p.breathe) * 0.04;
+      // Vertical idle oscillation (±2px, 4s cycle)
+      const yOsc = Math.sin(elapsed * Math.PI * 2 / 4) * 2;
+      const ccy = cy + yOsc;
 
-      // Light paths
-      paths.forEach((path, i) => {
-        const pp = ((t * 0.001 * path.speed * p.pathSpeed + path.phase) % 1);
-        const maxR = size * 0.42 * path.length;
-        const ch = p.chaos * (Math.sin(t * 0.01 + i) * 0.5 + 0.5);
-        const startR = size * 0.08;
-        const pa = path.angle + ch * Math.sin(t * 0.005 + i);
+      // Ring rotation angle
+      const rotAngle = elapsed * rotSpeed;
+
+      // ---- AURA GLOW ----
+      const glowR = ringR + tubeR * 1.15;
+      const auraGrad = ctx.createRadialGradient(cx, ccy, ringR * 0.6, cx, ccy, glowR * 1.3);
+      auraGrad.addColorStop(0, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.06 * glowI})`);
+      auraGrad.addColorStop(0.6, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.03 * glowI})`);
+      auraGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = auraGrad;
+      ctx.beginPath(); ctx.arc(cx, ccy, glowR * 1.3, 0, Math.PI * 2); ctx.fill();
+
+      // ---- TORUS RING (2.5D approximation) ----
+      // Draw the ring as a series of segments with varying thickness + lighting to simulate 3D torus
+      // Light source from upper-left
+      const lightAngle = -Math.PI * 0.75;  // upper-left
+
+      // First pass: ring fill with depth shading
+      for (let i = 0; i < SEGMENTS; i++) {
+        const a1 = (i / SEGMENTS) * Math.PI * 2;
+        const a2 = ((i + 1) / SEGMENTS) * Math.PI * 2;
+
+        // Torus Y displacement for tilt (simulates 3D tilt on X axis)
+        const tiltY1 = Math.sin(a1) * TILT_X;
+        const tiltY2 = Math.sin(a2) * TILT_X;
+
+        // Sine wave displacement — the traveling pulse
+        const pulsePhase = a1 - elapsed * pulseFreq * Math.PI * 2;
+        const displacement = Math.sin(pulsePhase) * pulseAmp * tubeR;
+        // Second harmonic (thinking state)
+        const displacement2 = Math.sin(pulsePhase * 2.3 + 0.5) * harm2 * tubeR;
+        // Error state: sawtooth-ish spike
+        let errorSpike = 0;
+        if (s === "error" && transT < 0.8) {
+          const sawPhase = ((a1 - elapsed * 8) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+          errorSpike = sawPhase < 1.0 ? (1 - sawPhase) * tubeR * 1.5 * (1 - transT) : 0;
+        }
+        const totalDisp = displacement + displacement2 + errorSpike;
+
+        // Ring position with rotation
+        const ra1 = a1 + rotAngle;
+        const ra2 = a2 + rotAngle;
+        const x1 = cx + Math.cos(ra1) * (ringR + totalDisp);
+        const y1 = ccy + Math.sin(ra1) * (ringR + totalDisp) * (1 - TILT_X * 0.3);
+        const x2 = cx + Math.cos(ra2) * (ringR + totalDisp);
+        const y2 = ccy + Math.sin(ra2) * (ringR + totalDisp) * (1 - TILT_X * 0.3);
+
+        // Tube thickness varies with viewing angle (torus depth)
+        const depthFactor = 1 + tiltY1 * 0.5; // front of torus is thicker
+        const currentTube = tubeR * depthFactor * (0.8 + pulseAmp * 0.2 * Math.abs(Math.sin(pulsePhase)));
+
+        // Lighting: dot product of surface normal with light direction
+        const normalAngle = ra1;
+        const lightDot = Math.cos(normalAngle - lightAngle) * 0.5 + 0.5;
+        const depthLight = (1 + tiltY1) * 0.5; // top of torus is lit, bottom is dark
+        const brightness = 0.2 + lightDot * 0.5 + depthLight * 0.3;
+
+        // Subsurface scattering glow
+        const sss = Math.max(0, Math.sin(pulsePhase)) * pulseAmp * 0.4;
+
+        const r = Math.round(color[0] * brightness + sss * 40);
+        const g = Math.round(color[1] * brightness + sss * 60);
+        const b = Math.round(color[2] * brightness + sss * 50);
+        const alpha = 0.7 + brightness * 0.3;
 
         ctx.beginPath();
-        ctx.strokeStyle = path.isGold
-          ? `rgba(212,160,23,${(0.15 + pp * 0.35) * p.brightness})`
-          : `rgba(6,182,212,${(0.1 + pp * 0.3) * p.brightness})`;
-        ctx.lineWidth = path.width * (0.5 + pp * 0.5);
-
-        for (let s = 0; s <= 20; s++) {
-          const f = s / 20;
-          let r = startR + f * maxR * breathe;
-          if (path.loopsBack && f > 0.6) r = startR + 0.6 * maxR * breathe - (f - 0.6) / 0.4 * 0.3 * maxR * breathe;
-          const co = Math.sin(f * Math.PI) * path.curvature;
-          const a = pa + co;
-          const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-          s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-          if (!path.isComplete && !path.loopsBack && f > path.length * 0.7) break;
-        }
+        ctx.strokeStyle = `rgba(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)},${alpha})`;
+        ctx.lineWidth = currentTube * 2;
+        ctx.lineCap = "round";
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
+      }
 
-        // Pulse particle
-        const pf = pp * (path.isComplete ? 1 : path.length);
-        let pr = startR + pf * maxR * breathe;
-        if (path.loopsBack && pf > 0.6) pr = startR + 0.6 * maxR * breathe - (pf - 0.6) / 0.4 * 0.3 * maxR * breathe;
-        const ppa = pa + Math.sin(pf * Math.PI) * path.curvature;
-        const px = cx + Math.cos(ppa) * pr, py = cy + Math.sin(ppa) * pr;
-        const pg = ctx.createRadialGradient(px, py, 0, px, py, 4);
-        const pc = path.isGold ? "212,160,23" : "6,182,212";
-        pg.addColorStop(0, `rgba(${pc},${0.8 * p.brightness})`);
-        pg.addColorStop(1, `rgba(${pc},0)`);
-        ctx.fillStyle = pg;
-        ctx.beginPath();
-        ctx.arc(px, py, 3 + path.width, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      // ---- INNER GLOW (subsurface scattering on ring) ----
+      const innerGlow = ctx.createRadialGradient(cx, ccy, ringR * 0.85, cx, ccy, ringR * 1.15);
+      innerGlow.addColorStop(0, "transparent");
+      innerGlow.addColorStop(0.4, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.04 * glowI})`);
+      innerGlow.addColorStop(0.6, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.02 * glowI})`);
+      innerGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = innerGlow;
+      ctx.beginPath(); ctx.arc(cx, ccy, ringR * 1.15, 0, Math.PI * 2); ctx.fill();
 
-      // Core glow
-      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.2);
-      cg.addColorStop(0, `rgba(6,182,212,${0.25 * p.brightness})`);
-      cg.addColorStop(0.5, `rgba(10,37,64,${0.4 * p.brightness})`);
-      cg.addColorStop(1, "transparent");
-      ctx.fillStyle = cg;
-      ctx.beginPath(); ctx.arc(cx, cy, size * 0.18 * breathe, 0, Math.PI * 2); ctx.fill();
-
-      // Faceted core
+      // ---- EKG WAVEFORM LINE (outer circumference readout) ----
       ctx.beginPath();
-      coreVerts.forEach((v, i) => {
-        const w = Math.sin(t * 0.002 + v.phase) * 2 * (1 + p.chaos);
-        const r = (v.baseR + w) * breathe;
-        const x = cx + Math.cos(v.angle + t * 0.0003) * r;
-        const y = cy + Math.sin(v.angle + t * 0.0003) * r;
+      ctx.strokeStyle = `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.5 * glowI})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= SEGMENTS; i++) {
+        const a = (i / SEGMENTS) * Math.PI * 2;
+        const ra = a + rotAngle;
+        const pulsePhase = a - elapsed * pulseFreq * Math.PI * 2;
+        const disp = Math.sin(pulsePhase) * pulseAmp * tubeR * 0.6;
+        const disp2 = Math.sin(pulsePhase * 2.3 + 0.5) * harm2 * tubeR * 0.5;
+        const outerR = ringR + tubeR + 3 + disp + disp2;
+        const x = cx + Math.cos(ra) * outerR;
+        const y = ccy + Math.sin(ra) * outerR * (1 - TILT_X * 0.3);
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      });
-      ctx.closePath();
-      const cf = ctx.createRadialGradient(cx - size * 0.02, cy - size * 0.02, 0, cx, cy, size * 0.14);
-      cf.addColorStop(0, `rgba(10,50,80,${0.9 * p.brightness})`);
-      cf.addColorStop(0.6, `rgba(6,30,50,${0.8 * p.brightness})`);
-      cf.addColorStop(1, `rgba(4,15,30,${0.6 * p.brightness})`);
-      ctx.fillStyle = cf; ctx.fill();
-      ctx.strokeStyle = `rgba(6,182,212,${0.5 * p.brightness})`; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      ctx.stroke();
 
-      // Facet lines + gold threads
-      for (let i = 0; i < coreVerts.length; i++) {
-        const v = coreVerts[i];
-        const r = (v.baseR + Math.sin(t * 0.002 + v.phase) * 2) * breathe;
-        const x = cx + Math.cos(v.angle + t * 0.0003) * r;
-        const y = cy + Math.sin(v.angle + t * 0.0003) * r;
-        if (i % 3 === 0) {
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y);
-          ctx.strokeStyle = `rgba(212,160,23,${0.25 * p.brightness})`; ctx.lineWidth = 0.5; ctx.stroke();
+      // ---- PULSE GLOW (traveling highlight on ring) ----
+      const pulseAngle = rotAngle + elapsed * pulseFreq * Math.PI * 2;
+      const px = cx + Math.cos(pulseAngle) * ringR;
+      const py = ccy + Math.sin(pulseAngle) * ringR * (1 - TILT_X * 0.3);
+      const pulseGlow = ctx.createRadialGradient(px, py, 0, px, py, tubeR * 3);
+      pulseGlow.addColorStop(0, `rgba(${Math.round(Math.min(255, color[0] + 60))},${Math.round(Math.min(255, color[1] + 60))},${Math.round(Math.min(255, color[2] + 60))},${0.5 * glowI})`);
+      pulseGlow.addColorStop(0.5, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${0.15 * glowI})`);
+      pulseGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = pulseGlow;
+      ctx.beginPath(); ctx.arc(px, py, tubeR * 3, 0, Math.PI * 2); ctx.fill();
+
+      // ---- SUCCESS PING (expanding sonar ring) ----
+      if (successPingT > 0) {
+        const pingAge = elapsed - successPingT;
+        if (pingAge < 1.0) {
+          const pingR = ringR + pingAge * size * 0.2;
+          const pingAlpha = (1 - pingAge) * 0.6;
+          ctx.beginPath();
+          ctx.arc(cx, ccy, pingR, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0,255,136,${pingAlpha})`;
+          ctx.lineWidth = 2 * (1 - pingAge);
+          ctx.stroke();
         }
-        const j = (i + 3) % coreVerts.length;
-        const v2 = coreVerts[j];
-        const r2 = (v2.baseR + Math.sin(t * 0.002 + v2.phase) * 2) * breathe;
-        const x2 = cx + Math.cos(v2.angle + t * 0.0003) * r2;
-        const y2 = cy + Math.sin(v2.angle + t * 0.0003) * r2;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2);
-        ctx.strokeStyle = `rgba(6,182,212,${0.15 * p.brightness})`; ctx.lineWidth = 0.5; ctx.stroke();
       }
 
-      // Center point
-      const cen = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.04);
-      cen.addColorStop(0, `rgba(200,240,255,${0.6 * p.brightness})`);
-      cen.addColorStop(0.5, `rgba(6,182,212,${0.3 * p.brightness})`);
-      cen.addColorStop(1, "transparent");
-      ctx.fillStyle = cen; ctx.beginPath(); ctx.arc(cx, cy, size * 0.04, 0, Math.PI * 2); ctx.fill();
-
-      // Floating particles
-      particles.forEach(pt => {
-        pt.angle += pt.speed * p.pathSpeed;
-        pt.dist += Math.sin(t * 0.001 + pt.angle) * pt.drift;
-        const x = cx + Math.cos(pt.angle) * pt.dist * breathe;
-        const y = cy + Math.sin(pt.angle) * pt.dist * breathe;
-        const op = pt.opacity * p.brightness * (0.5 + Math.sin(t * 0.003 + pt.angle) * 0.5);
+      // ---- PARTICLES (data points) ----
+      const activeCount = Math.round(lerp(
+        getStateParams(stateRef.current.prevStatus).particleCount,
+        cur.particleCount,
+        easeT
+      ));
+      const orbitDir = cur.particleOrbit ? 1 : 0;
+      particles.forEach((pt, idx) => {
+        if (idx >= activeCount) return;
+        // Orbit or drift lazily inward
+        pt.angle += pt.vAngle + orbitDir * rotSpeed * 0.3 * (1 / 60);
+        const x = cx + Math.cos(pt.angle) * pt.dist;
+        const y = ccy + Math.sin(pt.angle) * pt.dist;
+        const op = pt.opacity * glowI * (0.4 + Math.sin(elapsed * 2 + idx) * 0.3);
         ctx.beginPath(); ctx.arc(x, y, pt.sz, 0, Math.PI * 2);
-        ctx.fillStyle = pt.isGold ? `rgba(212,160,23,${op})` : `rgba(6,182,212,${op * 0.7})`;
-        ctx.fill();
+        const pg = ctx.createRadialGradient(x, y, 0, x, y, pt.sz * 2);
+        pg.addColorStop(0, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},${op})`);
+        pg.addColorStop(1, `rgba(${Math.round(color[0])},${Math.round(color[1])},${Math.round(color[2])},0)`);
+        ctx.fillStyle = pg;
+        ctx.beginPath(); ctx.arc(x, y, pt.sz * 2, 0, Math.PI * 2); ctx.fill();
       });
-
-      // Outer pulse ring
-      if (stateRef.current.status !== "idle") {
-        const rp = (Math.sin(t * 0.002 * p.pulseSpeed) + 1) / 2;
-        ctx.beginPath(); ctx.arc(cx, cy, size * 0.38 + rp * size * 0.05, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(6,182,212,${0.08 * rp * p.brightness})`; ctx.lineWidth = 1; ctx.stroke();
-      }
 
       animRef.current = requestAnimationFrame(draw);
     }
 
     animRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animRef.current);
-  }, [size, status]);
+  }, [size]);
+
+  const glowColor = status === "thinking" ? CAD.violet
+    : status === "error" ? CAD.red
+    : status === "success" ? CAD.green
+    : CAD.base;
 
   return (
     <canvas ref={canvasRef} style={{
       width: size, height: size, borderRadius: "50%",
-      filter: `drop-shadow(0 0 ${status === "thinking" ? 30 : 15}px rgba(6,182,212,${status === "idle" ? 0.1 : 0.3}))`,
-      transition: "filter 0.6s ease",
+      filter: `drop-shadow(0 0 ${status === "thinking" ? 25 : status === "idle" ? 8 : 15}px ${glowColor}${status === "idle" ? "18" : "50"})`,
+      transition: "filter 0.5s ease",
     }} />
   );
 }
