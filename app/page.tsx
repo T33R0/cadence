@@ -44,9 +44,9 @@ const Refresh = Ic(<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 
 const MsgCircle = Ic(<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>);
 
 /* ═══════════════════════════════════════════════════════════════
-   OGMA AVATAR — Canvas-based crystalline intelligence
+   CADENCE AVATAR — Canvas-based crystalline intelligence
    ═══════════════════════════════════════════════════════════════ */
-function OgmaAvatar({ status = "online", size = 200 }: { status?: string; size?: number }) {
+function CadenceAvatar({ status = "online", size = 200 }: { status?: string; size?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const timeRef = useRef<number>(0);
@@ -322,7 +322,7 @@ function MacroBar({ label, value, target, unit = "g", color }: any) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CHAT WITH OGMA
+   CHAT WITH CADENCE
    ═══════════════════════════════════════════════════════════════ */
 type ChatMsg = { id: string; role: "user" | "assistant"; content: string; created_at: string };
 
@@ -332,10 +332,10 @@ function useChat(onDataChanged?: () => void) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sessionId] = useState(() => {
     if (typeof window !== "undefined") {
-      const stored = sessionStorage.getItem("ogma_chat_session");
+      const stored = sessionStorage.getItem("cadence_chat_session");
       if (stored) return stored;
       const id = crypto.randomUUID();
-      sessionStorage.setItem("ogma_chat_session", id);
+      sessionStorage.setItem("cadence_chat_session", id);
       return id;
     }
     return crypto.randomUUID();
@@ -425,7 +425,7 @@ function useChat(onDataChanged?: () => void) {
   const clearChat = useCallback(() => {
     setMessages([]);
     const id = crypto.randomUUID();
-    sessionStorage.setItem("ogma_chat_session", id);
+    sessionStorage.setItem("cadence_chat_session", id);
   }, []);
 
   return { messages, sending, send, clearChat, sessionId, loadingHistory };
@@ -454,9 +454,9 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
       {/* Chat header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <OgmaAvatar status={status} size={32} />
+          <CadenceAvatar status={status} size={32} />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Ogma</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Cadence</div>
             <div style={{ fontSize: 10, color: sending ? C.cyan : C.green }}>
               {sending ? "thinking..." : "online"}
             </div>
@@ -471,15 +471,15 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "18px 20px", background: C.bg, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 14 }}>
         {loadingHistory && messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            <OgmaAvatar status="thinking" size={80} />
+            <CadenceAvatar status="thinking" size={80} />
             <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center" }}>Loading conversation...</div>
           </div>
         )}
         {!loadingHistory && messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            <OgmaAvatar status="idle" size={80} />
+            <CadenceAvatar status="idle" size={80} />
             <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
-              Talk directly with Ogma. Ask about tasks, training, DDPC status, or anything on your mind.
+              Talk directly with Cadence. Ask about tasks, training, nutrition, body metrics, or anything on your mind.
             </div>
           </div>
         )}
@@ -530,7 +530,7 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-          placeholder="Message Ogma..."
+          placeholder="Message Cadence..."
           disabled={sending}
           style={{
             flex: 1, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 10,
@@ -557,7 +557,7 @@ function ChatWindow({ status, onDataChanged }: { status: string; onDataChanged?:
 /* ═══════════════════════════════════════════════════════════════
    MAIN DASHBOARD
    ═══════════════════════════════════════════════════════════════ */
-export default function OgmaCommandCenter() {
+export default function CadenceCommandCenter() {
   const [activeTab, setActiveTab] = useState("overview");
   const [agentStatus] = useState("online");
   const [time, setTime] = useState(new Date());
@@ -591,8 +591,8 @@ export default function OgmaCommandCenter() {
   if (d.loading) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 20 }}>
-        <OgmaAvatar status="thinking" size={120} />
-        <div style={{ color: C.textMuted, fontSize: 13, letterSpacing: 1 }}>CONNECTING TO OGMA…</div>
+        <CadenceAvatar status="thinking" size={120} />
+        <div style={{ color: C.textMuted, fontSize: 13, letterSpacing: 1 }}>CONNECTING TO CADENCE…</div>
       </div>
     );
   }
@@ -601,7 +601,7 @@ export default function OgmaCommandCenter() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
       {/* Sidebar */}
       <nav style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 68, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 18, gap: 2, zIndex: 10 }}>
-        <div style={{ marginBottom: 14 }}><OgmaAvatar status={agentStatus} size={38} /></div>
+        <div style={{ marginBottom: 14 }}><CadenceAvatar status={agentStatus} size={38} /></div>
         {navItems.map(item => {
           const active = activeTab === item.id;
           return (
@@ -624,7 +624,7 @@ export default function OgmaCommandCenter() {
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-              <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Ogma</span>
+              <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Cadence</span>
               <span style={{ fontSize: 10, padding: "3px 12px", borderRadius: 20, fontWeight: 600, background: `${C.green}12`, color: C.green, border: `1px solid ${C.green}25` }}>● ONLINE</span>
             </div>
             <div style={{ fontSize: 12, color: C.textMuted }}>
@@ -639,7 +639,7 @@ export default function OgmaCommandCenter() {
               <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: 1 }}>GENESIS RACE</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, lineHeight: 1.1 }}>{d.genesisCountdown} <span style={{ fontSize: 12, fontWeight: 400, color: C.textDim }}>days</span></div>
             </div>
-            <OgmaAvatar status={agentStatus} size={56} />
+            <CadenceAvatar status={agentStatus} size={56} />
           </div>
         </header>
 
@@ -847,8 +847,8 @@ export default function OgmaCommandCenter() {
                 </Panel>
 
                 <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <OgmaAvatar status={agentStatus} size={120} />
-                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 12, letterSpacing: 1 }}>OGMA · ACTIVE</div>
+                  <CadenceAvatar status={agentStatus} size={120} />
+                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 12, letterSpacing: 1 }}>CADENCE · ACTIVE</div>
                 </div>
               </div>
             </div>
@@ -894,9 +894,9 @@ export default function OgmaCommandCenter() {
           <div className="fade-in">
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, padding: "30px 0" }}>
               <div style={{ textAlign: "center" }}>
-                <OgmaAvatar status={agentStatus} size={180} />
-                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 16, letterSpacing: 2 }}>OGMA</div>
-                <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>Celtic god of eloquence, writing, and strength</div>
+                <CadenceAvatar status={agentStatus} size={180} />
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 16, letterSpacing: 2 }}>CADENCE</div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>Rhythm, pace, precision — the tempo of peak performance</div>
               </div>
             </div>
 
@@ -938,7 +938,7 @@ export default function OgmaCommandCenter() {
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
             <span style={{ fontSize: 11, color: C.textMuted }}>connected · bghyjxxjtkzvmfkbibqp</span>
           </div>
-          <span style={{ fontSize: 11, color: C.textDim }}>{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · Ogma CC v0.2.0</span>
+          <span style={{ fontSize: 11, color: C.textDim }}>{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · Cadence v0.3.0</span>
         </footer>
       </main>
     </div>
